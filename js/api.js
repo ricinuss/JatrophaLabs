@@ -3,7 +3,10 @@
 
 function getValidKeys() {
     if (S.apiMode === 'default') {
-        return DEFAULT_API_KEYS.filter(k => k && k.trim().length >= 30);
+        const decoded = _OBFUSCATED_KEYS.map(k => {
+            try { return atob(k.replace(/\s/g, '')); } catch { return ''; }
+        });
+        return decoded.filter(k => k && k.trim().length >= 30);
     }
     return S.apiKeys.filter(k => k && k.trim().length >= 30);
 }
