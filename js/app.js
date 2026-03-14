@@ -11,6 +11,7 @@
     initScrollWatcher();
     if (window.innerWidth <= 768) sidebar.classList.add('hide');
     el('inp').focus();
+    document.documentElement.style.setProperty('--font-size-chat', (S.fontSize || 14) + 'px');
 
     console.log('%c⚡ RicinusAI v2.0 inicializado!', 'color:#8b5cf6;font-weight:bold;font-size:14px');
 })();
