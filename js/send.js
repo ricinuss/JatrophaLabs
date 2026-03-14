@@ -16,9 +16,22 @@ function checkMedicalContent(text) {
     return MEDICAL_KEYWORDS.some(k => lower.includes(k));
 }
 
+const LEGAL_KEYWORDS = [
+    'processo', 'contrato', 'advogado', 'lei', 'crime', 'tribunal',
+    'juiz', 'sentença', 'recurso', 'ação judicial', 'direito', 'multa',
+    'indenização', 'réu', 'autor', 'petição', 'liminar', 'mandado',
+    'delegacia', 'boletim de ocorrência', 'divórcio', 'herança', 'testamento'
+];
+
+function checkLegalContent(text) {
+    const lower = text.toLowerCase();
+    return LEGAL_KEYWORDS.some(k => lower.includes(k));
+}
+
 async function send() {
     const inp = el('inp');
     const text = inp.value.trim();
+    
     if (checkMedicalContent(text)) {
     toast('⚕️ Consulte sempre um profissional de saúde.', 'ℹ️');
     
@@ -28,6 +41,18 @@ async function send() {
         <span>⚕️</span>
         <span>As informações abaixo são de caráter informativo. Consulte sempre um médico ou profissional de saúde habilitado antes de tomar qualquer decisão clínica.</span>`;
     chatMsgs.appendChild(alertDiv);}
+
+    if (checkLegalContent(text)) {
+    toast('⚖️ Consulte sempre um advogado para questões jurídicas.', 'ℹ️');
+
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'legal-alert';
+    alertDiv.innerHTML = `
+        <span>⚖️</span>
+        <span>As informações abaixo são de caráter informativo. Consulte sempre um advogado habilitado antes de tomar decisões jurídicas.</span>`;
+    chatMsgs.appendChild(alertDiv);
+}
+    
     if ((!text && pendingImages.length === 0) || generating) return;
     if (!getValidKeys().length) { toast('Configure uma chave API', '⚠️'); openSet(); return; }
 
