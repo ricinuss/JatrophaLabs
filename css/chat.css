@@ -396,4 +396,13 @@
     .w-cards { grid-template-columns: 1fr }
     .w-title { font-size: 20px }
     .chat-msgs { padding: 14px 10px }
+
+    .msg { gap: 7px }
+    .msg-av { width: 24px; height: 24px }
+    .msg-text { font-size: 13px }
+    .msg-images img { max-width: 100%; max-height: 160px }
+
+    .think-box { font-size: 11px }
+    .code-head { font-size: 10px }
+    .msg-meta { gap: 6px; font-size: 9px }
 }
