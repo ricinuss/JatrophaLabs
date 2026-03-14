@@ -171,14 +171,8 @@ async function handleStream(stream, c, t0, keyUsed) {
     const dur = ((Date.now() - t0) / 1000).toFixed(1);
     const u = lastU || {};
 
-    stMeta.style.display = 'flex';
-    stMeta.innerHTML = `
-        ${u.promptTokenCount ? `<span class="meta-i">📥 ${u.promptTokenCount} in</span>` : ''}
-        ${u.candidatesTokenCount ? `<span class="meta-i">📤 ${u.candidatesTokenCount} out</span>` : ''}
-        ${u.thoughtsTokenCount ? `<span class="meta-i">🧠 ${u.thoughtsTokenCount} think</span>` : ''}
-        <span class="meta-i">⏱️ ${dur}s</span>
-        <span class="meta-i">🤖 ${S.model}</span>
-        <span class="meta-i">🔑 #${(keyUsed || 0) + 1}</span>`;
+    stMeta.style.display = 'none';
+    stMeta.innerHTML = '';
 
     // Word count
     const wc = wordCount(txt);
