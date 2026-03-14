@@ -53,6 +53,7 @@ function openSet() {
     el('thinkBudgetGrp').style.display = S.thinking ? 'flex' : 'none';
     el('fontSl').value = S.fontSize || 14;
     el('fontV').textContent = (S.fontSize || 14) + 'px';
+    loadAvatarPreview();
     updThemeUI();
     setModal.classList.add('show');
 }
