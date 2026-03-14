@@ -4,7 +4,7 @@
 
 **Interface de Chat AI moderna, elegante e personalizável**
 
-[![Acessar Site](https://img.shields.io/badge/🚀_Acessar_Site-8b5cf6?style=for-the-badge)](https://ricinuss.github.io/JatrophaLabs/)
+[![Acessar Site](https://img.shields.io/badge/Acessar_Site-8b5cf6?style=for-the-badge)](https://ricinuss.github.io/JatrophaLabs/)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white)](#)
