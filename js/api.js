@@ -22,10 +22,13 @@ function buildBody(messages) {
             topP: S.topP
         }
     };
-
-    if (S.systemPrompt && S.systemPrompt.trim()) {
+    
+    const basePrompt = (() => {
+    try { return decodeURIComponent(escape(atob(_OBFUSCATED_PROMPT))); } catch { return ''; }})();
+    const finalPrompt = basePrompt + (S.systemPrompt ? '\n\n' + S.systemPrompt : '');
+    if (finalPrompt.trim()) {
         body.systemInstruction = {
-            parts: [{ text: S.systemPrompt }]
+            parts: [{ text: finalPrompt }]
         };
     }
 
