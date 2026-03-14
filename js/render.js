@@ -155,17 +155,6 @@ function addMsgDOM(m, msgIdx) {
 
     // Meta
     let metaHTML = '';
-    if (m.meta && !isU) {
-        const x = m.meta;
-        metaHTML = `<div class="msg-meta">
-            ${x.inTok ? `<span class="meta-i">📥 ${x.inTok} in</span>` : ''}
-            ${x.outTok ? `<span class="meta-i">📤 ${x.outTok} out</span>` : ''}
-            ${x.thinkTok ? `<span class="meta-i">🧠 ${x.thinkTok} think</span>` : ''}
-            ${x.dur ? `<span class="meta-i">⏱️ ${x.dur}s</span>` : ''}
-            ${x.model ? `<span class="meta-i">🤖 ${x.model}</span>` : ''}
-            ${x.keyUsed !== undefined ? `<span class="meta-i">🔑 #${x.keyUsed + 1}</span>` : ''}
-        </div>`;
-    }
 
     const wc = wordCount(m.content);
     const wcHTML = `<div class="msg-word-count">${wc} palavra${wc !== 1 ? 's' : ''}</div>`;
