@@ -23,6 +23,11 @@ const LEGAL_KEYWORDS = [
     'delegacia', 'boletim de ocorrência', 'divórcio', 'herança', 'testamento'
 ];
 
+function checkLegalContent(text) {
+    const lower = text.toLowerCase();
+    return LEGAL_KEYWORDS.some(k => lower.includes(k));
+}
+
 function checkSensitiveData(text) {
     const cpf = /\d{3}[\.\s]?\d{3}[\.\s]?\d{3}[-\.\s]?\d{2}/;
     const cartao = /\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}/;
@@ -30,44 +35,17 @@ function checkSensitiveData(text) {
     return cpf.test(text) || cartao.test(text) || senha.test(text);
 }
 
-function checkLegalContent(text) {
-    const lower = text.toLowerCase();
-    return LEGAL_KEYWORDS.some(k => lower.includes(k));
-}
-
 async function send() {
     const inp = el('inp');
     const text = inp.value.trim();
-    
-    if (checkMedicalContent(text)) {
-    toast('⚕️ Consulte sempre um profissional de saúde.', 'ℹ️');
-    
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'medical-alert';
-    alertDiv.innerHTML = `
-        <span>⚕️</span>
-        <span>As informações abaixo são de caráter informativo. Consulte sempre um médico ou profissional de saúde habilitado antes de tomar qualquer decisão clínica.</span>`;
-    chatMsgs.appendChild(alertDiv);
-    }
 
-    if (checkLegalContent(text)) {
-    toast('⚖️ Consulte sempre um advogado para questões jurídicas.', 'ℹ️');
-
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'legal-alert';
-    alertDiv.innerHTML = `
-        <span>⚖️</span>
-        <span>As informações abaixo são de caráter informativo. Consulte sempre um advogado habilitado antes de tomar decisões jurídicas.</span>`;
-    chatMsgs.appendChild(alertDiv);
-    }
-
-    if (checkSensitiveData(text)) {
-    const confirma = confirm('⚠️ Detectamos o que pode ser um dado sensível (CPF, cartão ou senha) na sua mensagem. Deseja enviar mesmo assim?');
-    if (!confirma) return;
-    }
-    
     if ((!text && pendingImages.length === 0) || generating) return;
     if (!getValidKeys().length) { toast('Configure uma chave API', '⚠️'); openSet(); return; }
+
+    if (checkSensitiveData(text)) {
+        const confirma = confirm('⚠️ Detectamos o que pode ser um dado sensível (CPF, cartão ou senha) na sua mensagem. Deseja enviar mesmo assim?');
+        if (!confirma) return;
+    }
 
     let c = active();
     if (!c) c = newChat();
@@ -89,6 +67,24 @@ async function send() {
 
     if (chatMsgs.querySelector('.welcome')) chatMsgs.innerHTML = '';
     addMsgDOM(uMsg, c.messages.length - 1);
+
+    // Alertas médico e jurídico aparecem após a mensagem do usuário
+    if (checkMedicalContent(text)) {
+        toast('⚕️ Consulte sempre um profissional de saúde.', 'ℹ️');
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'medical-alert';
+        alertDiv.innerHTML = `<span>⚕️</span><span>As informações abaixo são de caráter informativo. Consulte sempre um médico ou profissional de saúde habilitado antes de tomar qualquer decisão clínica.</span>`;
+        chatMsgs.appendChild(alertDiv);
+    }
+
+    if (checkLegalContent(text)) {
+        toast('⚖️ Consulte sempre um advogado para questões jurídicas.', 'ℹ️');
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'legal-alert';
+        alertDiv.innerHTML = `<span>⚖️</span><span>As informações abaixo são de caráter informativo. Consulte sempre um advogado habilitado antes de tomar decisões jurídicas.</span>`;
+        chatMsgs.appendChild(alertDiv);
+    }
+
     scrollDown();
 
     // Typing indicator
@@ -132,7 +128,7 @@ async function send() {
             };
             c.messages.push(eMsg);
             addMsgDOM(eMsg, c.messages.length - 1);
-            toast(e.message, '❌');
+            toast('Nossos servidores estão enfrentando instabilidades. Tente novamente.', '⚠️');
         }
     } finally {
         generating = false;
@@ -262,8 +258,38 @@ async function handleStream(stream, c, t0, keyUsed) {
     rgBtn.textContent = '🔄 Regenerar';
     rgBtn.addEventListener('click', () => regen());
 
+    const contBtn = document.createElement('button');
+    contBtn.className = 'act-btn';
+    contBtn.textContent = '▶️ Continuar';
+    contBtn.addEventListener('click', async () => {
+        if (generating) return;
+        const c = active();
+        if (!c) return;
+        const lastMsg = c.messages[c.messages.length - 1];
+        if (!lastMsg || lastMsg.role !== 'model') return;
+
+        c.messages.push({ role: 'user', content: 'Continue a resposta do ponto onde parou.' });
+        contBtn.disabled = true;
+
+        generating = true;
+        updBtn();
+        const t0 = Date.now();
+        try {
+            const res = await callAPI(c.messages);
+            if (res.isStream) await handleStream(res.stream, c, t0, res.keyUsed);
+            else handleFull(res.data, c, t0, res.keyUsed);
+        } catch(e) {
+            toast(e.message, '❌');
+        } finally {
+            generating = false;
+            updBtn();
+            save();
+        }
+    });
+
     acts.appendChild(cpBtn);
     acts.appendChild(rgBtn);
+    acts.appendChild(contBtn);
     d.querySelector('.msg-body').appendChild(acts);
 
     const msg = {
@@ -276,37 +302,6 @@ async function handleStream(stream, c, t0, keyUsed) {
     c.messages.push(msg);
 }
 
-const contBtn = document.createElement('button');
-contBtn.className = 'act-btn';
-contBtn.textContent = '▶️ Continuar';
-contBtn.addEventListener('click', async () => {
-    if (generating) return;
-    const c = active();
-    if (!c) return;
-    const lastMsg = c.messages[c.messages.length - 1];
-    if (!lastMsg || lastMsg.role !== 'model') return;
-
-    // Injeta instrução de continuar
-    c.messages.push({ role: 'user', content: 'Continue a resposta do ponto onde parou.' });
-    contBtn.disabled = true;
-
-    generating = true;
-    updBtn();
-    const t0 = Date.now();
-    try {
-        const res = await callAPI(c.messages);
-        if (res.isStream) await handleStream(res.stream, c, t0, res.keyUsed);
-        else handleFull(res.data, c, t0, res.keyUsed);
-    } catch(e) {
-        toast(e.message, '❌');
-    } finally {
-        generating = false;
-        updBtn();
-        save();
-    }
-});
-acts.appendChild(contBtn);
-
 function stopGen() {
     if (aborter) aborter.abort();
 }
@@ -315,7 +310,6 @@ async function regen() {
     const c = active();
     if (!c || c.messages.length < 2 || generating) return;
 
-    // Find and remove last model message
     let lastModelIdx = -1;
     for (let i = c.messages.length - 1; i >= 0; i--) {
         if (c.messages[i].role === 'model') { lastModelIdx = i; break; }
@@ -329,7 +323,6 @@ async function regen() {
     const lastMsg = c.messages[c.messages.length - 1];
     if (!lastMsg || lastMsg.role !== 'user') return;
 
-    // Typing indicator
     const typDiv = document.createElement('div');
     typDiv.className = 'msg';
     typDiv.id = 'typInd';
@@ -361,7 +354,7 @@ async function regen() {
             const eMsg = { role: 'model', content: `❌ **Erro:** ${e.message}`, meta: { dur: ((Date.now() - t0) / 1000).toFixed(1) } };
             c.messages.push(eMsg);
             addMsgDOM(eMsg, c.messages.length - 1);
-            toast(e.message, '⚠️');
+            toast('Nossos servidores estão enfrentando instabilidades. Tente novamente.', '⚠️');
         }
     } finally {
         generating = false;
