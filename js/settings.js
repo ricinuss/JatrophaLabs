@@ -51,6 +51,8 @@ function openSet() {
     el('thinkV').textContent = S.thinkingBudget;
     el('streamTog').checked = S.streaming;
     el('thinkBudgetGrp').style.display = S.thinking ? 'flex' : 'none';
+    el('fontSl').value = S.fontSize || 14;
+    el('fontV').textContent = (S.fontSize || 14) + 'px';
     updThemeUI();
     setModal.classList.add('show');
 }
