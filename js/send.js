@@ -276,6 +276,37 @@ async function handleStream(stream, c, t0, keyUsed) {
     c.messages.push(msg);
 }
 
+const contBtn = document.createElement('button');
+contBtn.className = 'act-btn';
+contBtn.textContent = '▶️ Continuar';
+contBtn.addEventListener('click', async () => {
+    if (generating) return;
+    const c = active();
+    if (!c) return;
+    const lastMsg = c.messages[c.messages.length - 1];
+    if (!lastMsg || lastMsg.role !== 'model') return;
+
+    // Injeta instrução de continuar
+    c.messages.push({ role: 'user', content: 'Continue a resposta do ponto onde parou.' });
+    contBtn.disabled = true;
+
+    generating = true;
+    updBtn();
+    const t0 = Date.now();
+    try {
+        const res = await callAPI(c.messages);
+        if (res.isStream) await handleStream(res.stream, c, t0, res.keyUsed);
+        else handleFull(res.data, c, t0, res.keyUsed);
+    } catch(e) {
+        toast(e.message, '❌');
+    } finally {
+        generating = false;
+        updBtn();
+        save();
+    }
+});
+acts.appendChild(contBtn);
+
 function stopGen() {
     if (aborter) aborter.abort();
 }
