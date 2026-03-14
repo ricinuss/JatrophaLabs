@@ -128,3 +128,21 @@
 }
 
 .attach-rm:hover { color: var(--red) }
+
+@media (max-width: 768px) {
+    .input-area { padding: 8px }
+
+    .input-box {
+        border-radius: 10px;
+        padding: 4px 8px;
+    }
+
+    .input-box textarea {
+        font-size: 13px;
+    }
+
+    .input-foot { font-size: 9px }
+
+    .attach-preview { gap: 4px }
+    .attach-item { font-size: 10px; padding: 2px 6px }
+}
