@@ -315,7 +315,19 @@ body {
         height: 100vh;
         z-index: 200;
         box-shadow: 4px 0 20px rgba(0,0,0,.5);
+        width: 80vw;
+        min-width: unset;
     }
 
     .sidebar.hide { transform: translateX(-100%) }
+
+    .m-head {
+        padding: 0 8px;
+        height: 46px;
+    }
+
+    .sel-wrap select {
+        font-size: 11px;
+        max-width: 160px;
+    }
 }
