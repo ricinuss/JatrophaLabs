@@ -139,6 +139,24 @@
                 </div>
             </div>
 
+            <div class="sg">
+                <label class="sg-label">Avatar</label>
+                <div style="display:flex; align-items:center; gap:10px; margin-top:4px">
+                    <div id="avatarPreview" style="
+                        width:40px; height:40px; border-radius:50%;
+                        background:var(--bg-4); border:2px solid var(--border);
+                        display:flex; align-items:center; justify-content:center;
+                        overflow:hidden; cursor:pointer; flex-shrink:0">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M5.5 21c0-4.14 2.91-7.5 6.5-7.5s6.5 3.36 6.5 7.5"/></svg>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px">
+                        <button class="btn-add-key" id="btnChangeAvatar">📷 Alterar foto</button>
+                        <button class="btn-add-key" id="btnRemoveAvatar">🗑️ Remover</button>
+                    </div>
+                </div>
+                <input type="file" id="avatarInput" accept="image/*" style="display:none">
+            </div>
+
             <!-- Chaves API (oculto para usuário) -->
             <div class="sg" style="display:none">
                 <label class="sg-label">Chaves API</label>
