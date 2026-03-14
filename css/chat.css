@@ -18,6 +18,7 @@
 }
 
 /* ═══════════ WELCOME ═══════════ */
+
 .welcome {
     display: flex;
     flex-direction: column;
@@ -202,6 +203,23 @@
 .msg-text a { color: var(--accent); text-decoration: none }
 .msg-text a:hover { text-decoration: underline }
 .msg-text hr { border: none; border-top: 1px solid var(--border); margin: 12px 0 }
+
+/*============MEDICAL ALERT =========*/
+
+.medical-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: rgba(245, 158, 11, .08);
+    border: 1px solid rgba(245, 158, 11, .3);
+    border-left: 3px solid var(--yellow);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--tx-2);
+    line-height: 1.5;
+    animation: msgIn .25s ease-out;
+}
 
 /* ═══════════ THINKING ═══════════ */
 .think-box {
