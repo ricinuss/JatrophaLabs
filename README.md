@@ -79,4 +79,4 @@
 
 ## 📄 Licença
 
-MIT © 2025 [JatrophaLabs](https://github.com/ricinuss)
+MIT © 2025 [ricinuss](https://github.com/ricinuss)
