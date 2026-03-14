@@ -57,6 +57,15 @@ function openSet() {
     setModal.classList.add('show');
 }
 
+function loadAvatarPreview() {
+    const preview = el('avatarPreview');
+    if (S.userAvatar) {
+        preview.innerHTML = `<img src="${S.userAvatar}" style="width:100%;height:100%;object-fit:cover">`;
+    } else {
+        preview.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M5.5 21c0-4.14 2.91-7.5 6.5-7.5s6.5 3.36 6.5 7.5"/></svg>`;
+    }
+}
+
 function closeSet() {
     setModal.classList.remove('show');
 }
