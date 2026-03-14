@@ -23,6 +23,13 @@ const LEGAL_KEYWORDS = [
     'delegacia', 'boletim de ocorrência', 'divórcio', 'herança', 'testamento'
 ];
 
+function checkSensitiveData(text) {
+    const cpf = /\d{3}[\.\s]?\d{3}[\.\s]?\d{3}[-\.\s]?\d{2}/;
+    const cartao = /\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}/;
+    const senha = /(senha|password|secret)\s*[:=]\s*\S+/i;
+    return cpf.test(text) || cartao.test(text) || senha.test(text);
+}
+
 function checkLegalContent(text) {
     const lower = text.toLowerCase();
     return LEGAL_KEYWORDS.some(k => lower.includes(k));
@@ -40,7 +47,8 @@ async function send() {
     alertDiv.innerHTML = `
         <span>⚕️</span>
         <span>As informações abaixo são de caráter informativo. Consulte sempre um médico ou profissional de saúde habilitado antes de tomar qualquer decisão clínica.</span>`;
-    chatMsgs.appendChild(alertDiv);}
+    chatMsgs.appendChild(alertDiv);
+    }
 
     if (checkLegalContent(text)) {
     toast('⚖️ Consulte sempre um advogado para questões jurídicas.', 'ℹ️');
@@ -51,7 +59,12 @@ async function send() {
         <span>⚖️</span>
         <span>As informações abaixo são de caráter informativo. Consulte sempre um advogado habilitado antes de tomar decisões jurídicas.</span>`;
     chatMsgs.appendChild(alertDiv);
-}
+    }
+
+    if (checkSensitiveData(text)) {
+    const confirma = confirm('⚠️ Detectamos o que pode ser um dado sensível (CPF, cartão ou senha) na sua mensagem. Deseja enviar mesmo assim?');
+    if (!confirma) return;
+    }
     
     if ((!text && pendingImages.length === 0) || generating) return;
     if (!getValidKeys().length) { toast('Configure uma chave API', '⚠️'); openSet(); return; }
