@@ -1,6 +1,21 @@
 /* ═══════════ SEND & STREAMING ═══════════ */
 'use strict';
 
+const MEDICAL_KEYWORDS = [
+    'remédio', 'medicamento', 'medicina', 'médico', 'diagnóstico',
+    'diagnose', 'doença', 'sintoma', 'tratamento', 'dose', 'dosagem',
+    'bula', 'receita', 'prescrição', 'farmácia', 'antibiótico',
+    'analgésico', 'anti-inflamatório', 'vacina', 'cirurgia', 'exame',
+    'hospital', 'clínica', 'consulta', 'dor', 'febre', 'infecção',
+    'vírus', 'bactéria', 'câncer', 'tumor', 'diabetes', 'pressão alta',
+    'depressão', 'ansiedade', 'psiquiatra', 'psicólogo', 'terapia'
+];
+
+function checkMedicalContent(text) {
+    const lower = text.toLowerCase();
+    return MEDICAL_KEYWORDS.some(k => lower.includes(k));
+}
+
 async function send() {
     const inp = el('inp');
     const text = inp.value.trim();
