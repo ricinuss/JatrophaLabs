@@ -268,7 +268,7 @@ async function regen() {
             const eMsg = { role: 'model', content: `❌ **Erro:** ${e.message}`, meta: { dur: ((Date.now() - t0) / 1000).toFixed(1) } };
             c.messages.push(eMsg);
             addMsgDOM(eMsg, c.messages.length - 1);
-            toast(e.message, '❌');
+            toast(e.message, '⚠️');
         }
     } finally {
         generating = false;
