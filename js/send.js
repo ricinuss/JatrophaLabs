@@ -20,7 +20,14 @@ async function send() {
     const inp = el('inp');
     const text = inp.value.trim();
     if (checkMedicalContent(text)) {
-    toast('⚕️ Atenção: Para questões de saúde, consulte sempre um profissional médico.', 'ℹ️');}
+    toast('⚕️ Consulte sempre um profissional de saúde.', 'ℹ️');
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'medical-alert';
+    alertDiv.innerHTML = `
+        <span>⚕️</span>
+        <span>As informações abaixo são de caráter informativo. Consulte sempre um médico ou profissional de saúde habilitado antes de tomar qualquer decisão clínica.</span>`;
+    chatMsgs.appendChild(alertDiv);}
     if ((!text && pendingImages.length === 0) || generating) return;
     if (!getValidKeys().length) { toast('Configure uma chave API', '⚠️'); openSet(); return; }
 
