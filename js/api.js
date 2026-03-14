@@ -98,7 +98,6 @@ async function callAPI(messages) {
             if (res.status === 429 || res.status === 403 ||
                 errMsg.toLowerCase().includes('quota') ||
                 errMsg.toLowerCase().includes('rate')) {
-                toast(`Chave #${keyIdx + 1} sem quota, tentando próxima...`, '🔄');
                 tried++;
                 continue;
             }
@@ -114,7 +113,7 @@ async function callAPI(messages) {
         }
     }
 
-    throw new Error('Todas as chaves API falharam.');
+    throw new Error('Nossos servidores estão enfrentando instabilidades no momento. Tente novamente em alguns instantes.');
 }
 
 async function* parseSSE(stream) {
