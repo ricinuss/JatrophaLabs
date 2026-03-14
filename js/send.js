@@ -19,6 +19,8 @@ function checkMedicalContent(text) {
 async function send() {
     const inp = el('inp');
     const text = inp.value.trim();
+    if (checkMedicalContent(text)) {
+    toast('⚕️ Atenção: Para questões de saúde, consulte sempre um profissional médico.', 'ℹ️');}
     if ((!text && pendingImages.length === 0) || generating) return;
     if (!getValidKeys().length) { toast('Configure uma chave API', '⚠️'); openSet(); return; }
 
