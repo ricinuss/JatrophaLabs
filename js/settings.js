@@ -63,6 +63,8 @@ function closeSet() {
 
 function saveSet() {
     S.apiMode = el('apiModeDefault').classList.contains('active') ? 'default' : 'custom';
+    S.fontSize = parseInt(el('fontSl').value);
+    document.documentElement.style.setProperty('--font-size-chat', S.fontSize + 'px');
 
     if (S.apiMode === 'custom') {
         const keyInps = document.querySelectorAll('.key-inp');
