@@ -28,7 +28,7 @@ const DEFAULTS = {
     thinking: true,
     thinkingBudget: 8192,
     streaming: true,
-    theme: 'dark'
+    theme: 'dark',
     fontSize: 14,
     userAvatar: null // null = padrão, string base64 = customizado
 };
