@@ -109,7 +109,12 @@ function md(text) {
 
 // SVG icons used in messages
 const SVG = {
-    userAvatar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tx-3)"><circle cx="12" cy="8" r="4"/><path d="M5.5 21c0-4.14 2.91-7.5 6.5-7.5s6.5 3.36 6.5 7.5"/></svg>`,
+    get userAvatar() {
+        if (S.userAvatar) {
+            return `<img src="${S.userAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+        }
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tx-3)"><circle cx="12" cy="8" r="4"/><path d="M5.5 21c0-4.14 2.91-7.5 6.5-7.5s6.5 3.36 6.5 7.5"/></svg>`;
+    },
     botAvatar: `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.73 12.73l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`,
     copy: '📋',
     regen: '🔄',
