@@ -314,3 +314,12 @@
 }
 
 .api-mode-opt.active .api-mode-name { color: var(--accent) }
+
+@media (max-width: 768px) {
+    .modal { width: 96%; max-height: 90vh }
+    .theme-grid { grid-template-columns: repeat(2, 1fr) }
+    .m-body { padding: 14px; gap: 12px }
+    .m-hd { padding: 12px 14px }
+    .m-ft { padding: 10px 14px }
+    .api-mode-grid { grid-template-columns: 1fr 1fr }
+}
