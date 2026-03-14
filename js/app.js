@@ -41,6 +41,29 @@ btnSend.addEventListener('click', e => {
     else send();
 });
 
+el('btnChangeAvatar').addEventListener('click', () => el('avatarInput').click());
+
+el('avatarInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        S.userAvatar = reader.result;
+        save();
+        loadAvatarPreview();
+        toast('Avatar atualizado!', '✅');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+});
+
+el('btnRemoveAvatar').addEventListener('click', () => {
+    S.userAvatar = null;
+    save();
+    loadAvatarPreview();
+    toast('Avatar removido', 'ℹ️');
+});
+
 // Sidebar
 el('btnNew').addEventListener('click', () => newChat());
 el('btnMenu').addEventListener('click', toggleSidebar);
