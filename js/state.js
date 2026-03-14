@@ -29,6 +29,7 @@ const DEFAULTS = {
     thinkingBudget: 8192,
     streaming: true,
     theme: 'dark'
+    fontSize: 14
 };
 
 let S = { ...DEFAULTS };
