@@ -63,6 +63,11 @@ el('tokSl').addEventListener('input', function () { el('tokV').textContent = thi
 el('topSl').addEventListener('input', function () { el('topV').textContent = parseFloat(this.value).toFixed(2); });
 el('thinkTog').addEventListener('change', function () { el('thinkBudgetGrp').style.display = this.checked ? 'flex' : 'none'; });
 el('thinkSl').addEventListener('input', function () { el('thinkV').textContent = this.value; });
+el('fontSl').addEventListener('input', function() {
+    el('fontV').textContent = this.value + 'px';
+    document.documentElement.style.setProperty('--font-size-chat', this.value + 'px');
+});
+
 
 // API mode toggle
 el('apiModeDefault').addEventListener('click', () => setApiMode('default'));
