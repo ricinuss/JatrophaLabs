@@ -1,24 +1,69 @@
-/* ═══════════ SCROLLBAR ═══════════ */
-::-webkit-scrollbar { width: 5px }
-::-webkit-scrollbar-track { background: transparent }
-::-webkit-scrollbar-thumb { background: var(--border-l); border-radius: 3px }
+/* ═══════════ UTILS ═══════════
+   Componentes globais reutilizáveis:
+   badges, toasts, scroll, e utilitários
+   de acessibilidade e layout.
+   ══════════════════════════════ */
 
-/* ═══════════ BADGES ═══════════ */
+/* ═══════════ SCROLLBAR ═══════════
+   Webkit já definido em themes.css.
+   Este bloco cobre casos onde a
+   especificidade precisa ser maior.
+   ══════════════════════════════ */
+
+/* Garante scrollbar fina em contêineres específicos */
+.s-list,
+.m-body,
+.chat-wrap,
+.modal {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-l) transparent;
+}
+
+/* ═══════════ BADGE ═══════════ */
+
 .badge {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     padding: 2px 7px;
     border-radius: 8px;
     font-size: 10px;
     font-weight: 500;
+    transition:
+        background .2s var(--ease-out),
+        color      .2s var(--ease-out);
 }
 
-.badge.on { background: rgba(16,185,129,.12); color: var(--green) }
-.badge.off { background: rgba(239,68,68,.12); color: var(--red) }
-.badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor }
+.badge.on {
+    background: color-mix(in srgb, var(--green) 12%, transparent);
+    color: var(--green);
+}
+
+.badge.off {
+    background: color-mix(in srgb, var(--red) 12%, transparent);
+    color: var(--red);
+}
+
+.badge-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    /* Pulso sutil para indicar status ativo */
+    animation: dotPulse 2.4s ease-in-out infinite;
+}
+
+.badge.off .badge-dot {
+    animation: none;
+}
+
+@keyframes dotPulse {
+    0%, 100% { opacity: 1;   transform: scale(1)    }
+    50%       { opacity: .45; transform: scale(.75)  }
+}
 
 /* ═══════════ TOAST ═══════════ */
+
 .toast-box {
     position: fixed;
     top: 16px;
@@ -27,22 +72,179 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+    /* Permite clicar "através" do container quando vazio */
+    pointer-events: none;
 }
 
 .toast {
     background: var(--bg-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 10px 14px;
     font-size: 12px;
     color: var(--tx-1);
-    box-shadow: 0 6px 20px rgba(0,0,0,.4);
-    animation: tIn .25s ease, tOut .25s ease 2.7s forwards;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     max-width: 320px;
+    min-width: 180px;
+    pointer-events: auto;
+    cursor: default;
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, .3),
+        0 1px 4px  rgba(0, 0, 0, .2),
+        0 0 0 1px  rgba(255, 255, 255, .04);
+
+    /* Entra da direita com spring */
+    animation:
+        toastIn  .3s  var(--ease-out, cubic-bezier(.22, 1, .36, 1)) both,
+        toastOut .25s var(--ease-out, cubic-bezier(.22, 1, .36, 1)) 2.75s forwards;
 }
 
-@keyframes tIn { from { opacity: 0; transform: translateX(16px) } to { opacity: 1; transform: none } }
-@keyframes tOut { to { opacity: 0; transform: translateX(16px) } }
+/* Barra de progresso de duração */
+.toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    background: var(--accent);
+    border-radius: 0 0 10px 10px;
+    transform-origin: left;
+    animation: toastProgress 3s linear both;
+    opacity: .5;
+}
+
+/* Precisa de position para o ::after funcionar */
+.toast { position: relative; overflow: hidden }
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px) scale(.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+@keyframes toastOut {
+    to {
+        opacity: 0;
+        transform: translateX(20px) scale(.95);
+    }
+}
+
+@keyframes toastProgress {
+    from { transform: scaleX(1) }
+    to   { transform: scaleX(0) }
+}
+
+/* Ícone do toast não encolhe */
+.toast > span:first-child {
+    flex-shrink: 0;
+    font-size: 14px;
+    line-height: 1;
+}
+
+/* ═══════════ SKIP LINK (acessibilidade) ═══════════ */
+
+.skip-link {
+    position: fixed;
+    top: -100%;
+    left: 16px;
+    z-index: 9999;
+    padding: 8px 16px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: var(--radius-md, 8px);
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: top .15s;
+}
+
+.skip-link:focus { top: 16px }
+
+/* ═══════════ UTILITÁRIOS DE LAYOUT ═══════════ */
+
+/* Oculto visualmente mas acessível a screen readers */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Trunca texto com reticências */
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Centraliza com flexbox */
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ═══════════ ESTADOS DE CARREGAMENTO ═══════════ */
+
+/* Skeleton loader genérico */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-3)   25%,
+        var(--bg-4)   50%,
+        var(--bg-3)   75%
+    );
+    background-size: 200% 100%;
+    border-radius: var(--radius-sm, 4px);
+    animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    from { background-position: 200% 0 }
+    to   { background-position: -200% 0 }
+}
+
+/* ═══════════ RESPONSIVE ═══════════ */
+
+@media (max-width: 768px) {
+    .toast-box {
+        top: auto;
+        bottom: 80px;   /* acima da área de input mobile */
+        right: 12px;
+        left: 12px;
+    }
+
+    .toast {
+        max-width: 100%;
+        font-size: 11px;
+    }
+}
+
+/* ═══════════ PREFERÊNCIA: MENOS ANIMAÇÃO ═══════════
+   themes.css já zera --duration-* e --theme-transition.
+   Aqui cobrimos animações que usam valores hardcoded.
+   ══════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+    .toast {
+        animation:
+            toastIn  .1s linear both,
+            toastOut .1s linear 2.9s forwards;
+    }
+
+    .toast::after  { animation: none; display: none }
+    .badge-dot     { animation: none }
+    .skeleton      { animation: none; background: var(--bg-3) }
+}
