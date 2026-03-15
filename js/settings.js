@@ -191,8 +191,8 @@ function saveSet() {
 }
 
 // ─── Resetar configurações ────────────────────────────────────────────────────
-function resetSet() {
-    if (!confirm('Resetar todas as configurações para o padrão?')) return;
+async function resetSet() {
+    if (!await customConfirm('Resetar todas as configurações para o padrão?', { danger: true, confirmText: 'Resetar' })) return;
 
     resetSettings(); // do state.js
     updBadge();
