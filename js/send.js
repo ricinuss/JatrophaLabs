@@ -228,6 +228,9 @@ async function handleStream(stream, c, t0, keyUsed) {
     const stThink  = el(`stThink_${sid}`);
     const stThinkB = el(`stThinkB_${sid}`);
 
+    // Instancia o renderer progressivo
+    const renderer = new StreamRenderer(stTxt);
+
     el(`stThinkH_${sid}`)?.addEventListener('click', () => {
         stThinkB.classList.toggle('open');
         el(`stThinkAr_${sid}`)?.classList.toggle('open');
@@ -245,8 +248,8 @@ async function handleStream(stream, c, t0, keyUsed) {
                     stThink.style.display = 'block';
                     stThinkB.innerHTML    = md(think);
                 } else {
-                    txt            += p.text ?? '';
-                    stTxt.innerHTML = md(txt);
+                    txt += p.text ?? '';
+                    renderer.update(txt);
                 }
             }
             if (chunk.usageMetadata) lastU = chunk.usageMetadata;
@@ -255,6 +258,9 @@ async function handleStream(stream, c, t0, keyUsed) {
     } catch (e) {
         if (e.name !== 'AbortError') throw e;
     }
+
+    // Finaliza o renderer — congela tudo que resta
+    renderer.finalize();
 
     // Finaliza UI do streaming
     stTxt.classList.remove('streaming');
