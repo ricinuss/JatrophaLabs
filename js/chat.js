@@ -74,14 +74,14 @@ function delChat(id) {
 }
 
 /**
- * Renomeia um chat via prompt nativo.
+ * Renomeia um chat via modal customizado.
  * @param {string} id
  */
-function renChat(id) {
+async function renChat(id) {
     const c = chats.find(x => x.id === id);
     if (!c) return;
 
-    const name = prompt('Novo nome:', c.title)?.trim();
+    const name = (await customPrompt('Renomear chat', c.title, { placeholder: 'Nome do chat...' }))?.trim();
     if (!name) return;
 
     c.title = name;
@@ -146,19 +146,19 @@ function autoTitle(c) {
 }
 
 /**
- * Abre prompt para editar uma mensagem do usuário.
+ * Abre modal para editar uma mensagem do usuário.
  * Trunca o histórico a partir desse ponto e reenvia.
  *
  * @param {Chat}   chat
  * @param {number} msgIdx
  */
-function editMessage(chat, msgIdx) {
+async function editMessage(chat, msgIdx) {
     if (!chat || generating) return;
 
     const m = chat.messages[msgIdx];
     if (!m || m.role !== 'user') return;
 
-    const newContent = prompt('Editar mensagem:', m.content)?.trim();
+    const newContent = (await customPrompt('Editar mensagem', m.content, { placeholder: 'Mensagem...' }))?.trim();
     if (!newContent) return;
 
     chat.messages = chat.messages.slice(0, msgIdx);
