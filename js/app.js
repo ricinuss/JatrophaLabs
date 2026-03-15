@@ -1,55 +1,84 @@
-/* ═══════════ APP INITIALIZATION ═══════════ */
+/* ═══════════ APP INITIALIZATION & EVENT BINDINGS ═══════════ */
 'use strict';
 
+// ─── Inicialização ────────────────────────────────────────────────────────────
 (function init() {
     load();
+
     document.documentElement.setAttribute('data-theme', S.theme);
+    document.documentElement.style.setProperty('--font-size-chat', (S.fontSize || 14) + 'px');
+
     el('selModel').value = S.model;
     updBadge();
     renderList();
     renderMsgs();
     initScrollWatcher();
+
     if (window.innerWidth <= 768) sidebar.classList.add('hide');
+
     el('inp').focus();
-    document.documentElement.style.setProperty('--font-size-chat', (S.fontSize || 14) + 'px');
 
     console.log('%c⚡ RicinusAI v2.0 inicializado!', 'color:#8b5cf6;font-weight:bold;font-size:14px');
 })();
 
-// ═══════════ EVENT BINDINGS ═══════════
+// ─── Helpers internos ─────────────────────────────────────────────────────────
 
+/** Registra múltiplos eventos no mesmo elemento de uma vez */
+function _on(target, events, handler, options) {
+    const node = typeof target === 'string' ? el(target) : target;
+    for (const ev of [].concat(events)) {
+        node?.addEventListener(ev, handler, options);
+    }
+}
+
+/** Atualiza o texto de um elemento */
+function _setText(id, text) {
+    const node = el(id);
+    if (node) node.textContent = text;
+}
+
+// ─── Input de texto ───────────────────────────────────────────────────────────
 const inp = el('inp');
 
-inp.addEventListener('input', () => {
+_on(inp, 'input', () => {
     inp.style.height = 'auto';
     inp.style.height = Math.min(inp.scrollHeight, 180) + 'px';
     updBtn();
     updCharCount();
 });
 
-inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        if (generating) stopGen();
-        else send();
-    }
-});
-
-btnSend.addEventListener('click', e => {
+_on(inp, 'keydown', e => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
     e.preventDefault();
-    if (generating) stopGen();
-    else send();
+    generating ? stopGen() : send();
 });
 
-el('btnChangeAvatar').addEventListener('click', () => el('avatarInput').click());
+// Colar imagens
+_on(inp, 'paste', e => {
+    const files = [...(e.clipboardData?.items ?? [])]
+        .filter(i => i.type.startsWith('image/'))
+        .map(i => i.getAsFile())
+        .filter(Boolean);
 
-el('avatarInput').addEventListener('change', e => {
+    if (files.length) { e.preventDefault(); handleFiles(files); }
+});
+
+// ─── Botão enviar ─────────────────────────────────────────────────────────────
+_on('btnSend', 'click', e => {
+    e.preventDefault();
+    generating ? stopGen() : send();
+});
+
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+_on('btnChangeAvatar', 'click', () => el('avatarInput').click());
+
+_on('avatarInput', 'change', e => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = () => {
-        S.userAvatar = reader.result;
-        save();
+        updateSettings({ userAvatar: reader.result });
         loadAvatarPreview();
         toast('Avatar atualizado!', '✅');
     };
@@ -57,128 +86,118 @@ el('avatarInput').addEventListener('change', e => {
     e.target.value = '';
 });
 
-el('btnRemoveAvatar').addEventListener('click', () => {
-    S.userAvatar = null;
-    save();
+_on('btnRemoveAvatar', 'click', () => {
+    updateSettings({ userAvatar: null });
     loadAvatarPreview();
     toast('Avatar removido', 'ℹ️');
 });
 
-// Sidebar
-el('btnNew').addEventListener('click', () => newChat());
-el('btnMenu').addEventListener('click', toggleSidebar);
-sOverlay.addEventListener('click', closeMobile);
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+_on('btnNew',  'click', () => newChat());
+_on('btnMenu', 'click', toggleSidebar);
+_on(sOverlay,  'click', closeMobile);
 
-// Model selector
-S.model = 'gemini-2.5-flash';
+// ─── Settings — abertura / fechamento ─────────────────────────────────────────
+_on('btnOpenSet', 'click',  openSet);
+_on('btnClsSet',  'click',  closeSet);
+_on('btnCancel',  'click',  closeSet);
+_on('btnSave',    'click',  saveSet);
+_on('btnReset',   'click',  resetSet);
 
-// Settings
-el('btnOpenSet').addEventListener('click', openSet);
-el('btnClsSet').addEventListener('click', closeSet);
-el('btnCancel').addEventListener('click', closeSet);
-el('btnSave').addEventListener('click', saveSet);
-el('btnReset').addEventListener('click', resetSet);
-setModal.addEventListener('click', e => { if (e.target === setModal) closeSet(); });
+_on(setModal, 'click', e => { if (e.target === setModal) closeSet(); });
 
-// Sliders
-el('tempSl').addEventListener('input', function () { el('tempV').textContent = parseFloat(this.value).toFixed(1); });
-el('tokSl').addEventListener('input', function () { el('tokV').textContent = this.value; });
-el('topSl').addEventListener('input', function () { el('topV').textContent = parseFloat(this.value).toFixed(2); });
-el('thinkTog').addEventListener('change', function () { el('thinkBudgetGrp').style.display = this.checked ? 'flex' : 'none'; });
-el('thinkSl').addEventListener('input', function () { el('thinkV').textContent = this.value; });
-el('fontSl').addEventListener('input', function() {
-    el('fontV').textContent = this.value + 'px';
-    document.documentElement.style.setProperty('--font-size-chat', this.value + 'px');
+// ─── Sliders de configuração ──────────────────────────────────────────────────
+const SLIDERS = [
+    { sl: 'tempSl',  val: 'tempV',  fmt: v => parseFloat(v).toFixed(1) },
+    { sl: 'tokSl',   val: 'tokV',   fmt: v => v },
+    { sl: 'topSl',   val: 'topV',   fmt: v => parseFloat(v).toFixed(2) },
+    { sl: 'thinkSl', val: 'thinkV', fmt: v => v },
+    {
+        sl: 'fontSl', val: 'fontV', fmt: v => v + 'px',
+        extra: v => document.documentElement.style.setProperty('--font-size-chat', v + 'px'),
+    },
+];
+
+for (const { sl, val, fmt, extra } of SLIDERS) {
+    _on(sl, 'input', function () {
+        _setText(val, fmt(this.value));
+        extra?.(this.value);
+    });
+}
+
+// Toggle visibilidade do grupo thinking budget
+_on('thinkTog', 'change', function () {
+    el('thinkBudgetGrp').style.display = this.checked ? 'flex' : 'none';
 });
 
+// ─── Modo API ─────────────────────────────────────────────────────────────────
+_on('apiModeDefault', 'click', () => setApiMode('default'));
+_on('apiModeCustom',  'click', () => setApiMode('custom'));
 
-// API mode toggle
-el('apiModeDefault').addEventListener('click', () => setApiMode('default'));
-el('apiModeCustom').addEventListener('click', () => setApiMode('custom'));
-
-// Add custom key
-el('btnAddKey').addEventListener('click', () => {
+_on('btnAddKey', 'click', () => {
     if (S.apiMode !== 'custom') return;
     if (S.apiKeys.length >= 10) { toast('Máximo 10 chaves', '⚠️'); return; }
     S.apiKeys.push('');
     renderKeysList();
 });
 
-// Import/Export
-el('btnExport').addEventListener('click', exportChats);
-el('btnImport').addEventListener('click', importChats);
-el('btnClear').addEventListener('click', clearAll);
+// ─── Import / Export / Limpar ─────────────────────────────────────────────────
+_on('btnExport', 'click', exportChats);
+_on('btnImport', 'click', importChats);
+_on('btnClear',  'click', clearAll);
 
-// Scroll to bottom
-btnScrollBottom.addEventListener('click', () => scrollDown());
+// ─── Scroll para o fim ────────────────────────────────────────────────────────
+_on(btnScrollBottom, 'click', () => scrollDown());
 
-// Search
-el('searchChats').addEventListener('input', e => {
+// ─── Busca de chats ───────────────────────────────────────────────────────────
+_on('searchChats', 'input', e => {
     searchFilter = e.target.value.trim();
     renderList();
 });
 
-// Themes
+// ─── Temas ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.theme-opt').forEach(t => {
-    t.addEventListener('click', () => setTheme(t.dataset.theme));
+    _on(t, 'click', () => setTheme(t.dataset.theme));
 });
 
-// File attachment
-el('btnAttach').addEventListener('click', () => el('fileInput').click());
-el('fileInput').addEventListener('change', e => {
+// ─── Anexo de arquivos ────────────────────────────────────────────────────────
+_on('btnAttach', 'click', () => el('fileInput').click());
+
+_on('fileInput', 'change', e => {
     handleFiles(e.target.files);
     e.target.value = '';
 });
 
-// Drag & Drop
-document.addEventListener('dragover', e => {
+// ─── Drag & Drop ──────────────────────────────────────────────────────────────
+_on(document, 'dragover', e => {
     e.preventDefault();
     el('dropOverlay').classList.add('show');
 });
 
-document.addEventListener('dragleave', e => {
+_on(document, 'dragleave', e => {
     if (e.relatedTarget === null) el('dropOverlay').classList.remove('show');
 });
 
-document.addEventListener('drop', e => {
+_on(document, 'drop', e => {
     e.preventDefault();
     el('dropOverlay').classList.remove('show');
     if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
 });
 
-// Lightbox
-el('lightbox').addEventListener('click', () => {
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+function _closeLightbox() {
     el('lightbox').classList.remove('show');
     el('lbImg').src = '';
-});
+}
 
-// Paste images
-inp.addEventListener('paste', e => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    const imageFiles = [];
-    for (const item of items) {
-        if (item.type.startsWith('image/')) {
-            const file = item.getAsFile();
-            if (file) imageFiles.push(file);
-        }
-    }
-    if (imageFiles.length > 0) {
-        e.preventDefault();
-        handleFiles(imageFiles);
-    }
-});
+_on('lightbox', 'click', _closeLightbox);
 
-// Keyboard shortcuts
-document.addEventListener('keydown', e => {
-    if (e.ctrlKey && e.shiftKey && e.key === 'N') { e.preventDefault(); newChat(); }
-    if (e.ctrlKey && e.key === '/') { e.preventDefault(); toggleSidebar(); }
+// ─── Atalhos de teclado ───────────────────────────────────────────────────────
+_on(document, 'keydown', e => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'N') { e.preventDefault(); newChat(); return; }
+    if (e.ctrlKey && e.key === '/')               { e.preventDefault(); toggleSidebar(); return; }
+
     if (e.key === 'Escape') {
-        if (el('lightbox').classList.contains('show')) {
-            el('lightbox').classList.remove('show');
-            el('lbImg').src = '';
-        } else {
-            closeSet();
-        }
+        el('lightbox').classList.contains('show') ? _closeLightbox() : closeSet();
     }
 });
