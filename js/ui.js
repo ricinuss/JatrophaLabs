@@ -114,3 +114,19 @@ function initScrollWatcher() {
         btnScrollBottom.style.display = shouldShow ? 'flex' : 'none';
     }, { passive: true });
 }
+
+function updTitle(state) {
+    const base = 'RicinusAI';
+    const chat = active();
+
+    if (state === 'generating') {
+        document.title = `⏳ ${base} — pensando...`;
+    } else if (state === 'done') {
+        document.title = `✅ Resposta pronta — ${base}`;
+        setTimeout(() => updTitle('idle'), 3000);
+    } else {
+        document.title = chat?.title && chat.title !== 'Novo Chat'
+            ? `${chat.title} — ${base}`
+            : base;
+    }
+}
