@@ -20,10 +20,23 @@ const SVG_ICONS = {
 
 // Cards de sugestão da tela de boas-vindas
 const WELCOME_CARDS = [
-    { emoji: '🧠', title: 'Machine Learning',  desc: 'Explicação simples',   prompt: 'Explique como funciona machine learning de forma simples' },
-    { emoji: '💻', title: 'Código JS',          desc: 'Ordenar array',        prompt: 'Escreva uma função JavaScript para ordenar um array de objetos' },
-    { emoji: '🔒', title: 'Segurança API',       desc: 'Boas práticas REST',   prompt: 'Quais as melhores práticas de segurança para APIs REST?' },
-    { emoji: '📚', title: 'Python',             desc: 'Plano de estudos',     prompt: 'Crie um plano de 30 dias para aprender Python do zero' },
+    // Código
+    { emoji: '💻', title: 'Código JS',         desc: 'Ordenar array',        prompt: 'Escreva uma função JavaScript para ordenar um array de objetos por uma propriedade específica' },
+    { emoji: '🐍', title: 'Código Python',      desc: 'Script útil',          prompt: 'Escreva um script Python para renomear arquivos em lote numa pasta' },
+    { emoji: '🎨', title: 'CSS Animação',       desc: 'Efeito moderno',       prompt: 'Crie uma animação CSS fluida de loading skeleton para um card' },
+    { emoji: '🗄️', title: 'SQL Query',          desc: 'Consulta complexa',    prompt: 'Escreva uma query SQL para encontrar os 5 clientes que mais compraram no último mês' },
+
+    // Aprendizado
+    { emoji: '🧠', title: 'Machine Learning',   desc: 'Explicação simples',   prompt: 'Explique como funciona machine learning de forma simples com exemplos do dia a dia' },
+    { emoji: '🔒', title: 'Segurança API',       desc: 'Boas práticas REST',   prompt: 'Quais as melhores práticas de segurança para APIs REST em produção?' },
+    { emoji: '📚', title: 'Python',             desc: 'Plano de estudos',     prompt: 'Crie um plano de 30 dias para aprender Python do zero com recursos gratuitos' },
+    { emoji: '⚡', title: 'Performance Web',    desc: 'Otimizações',          prompt: 'Quais as principais técnicas para melhorar a performance de um site em 2024?' },
+
+    // Produtividade
+    { emoji: '📝', title: 'README',             desc: 'Para seu projeto',     prompt: 'Crie um README profissional para um projeto de API REST em Node.js' },
+    { emoji: '🔍', title: 'Code Review',        desc: 'Boas práticas',        prompt: 'Quais os pontos mais importantes para fazer um bom code review?' },
+    { emoji: '🚀', title: 'Deploy',             desc: 'Passo a passo',        prompt: 'Explique como fazer deploy de uma aplicação Node.js na AWS do zero' },
+    { emoji: '🐛', title: 'Debug',              desc: 'Estratégias',          prompt: 'Quais as melhores estratégias para debugar um bug difícil de reproduzir?' },
 ];
 
 // Grupos temporais para organizar chats na sidebar
@@ -272,7 +285,11 @@ function _bindMsgEvents(node, m, msgIdx, isUser, chat) {
 // ─── Tela de boas-vindas ──────────────────────────────────────────────────────
 
 function renderWelcome() {
-    const cards = WELCOME_CARDS.map(({ emoji, title, desc, prompt }) => `
+    const shuffled = [...WELCOME_CARDS]
+        .sort(() => Math.random() - .5)
+        .slice(0, 4);
+
+    const cards = shuffled.map(({ emoji, title, desc, prompt }) => `
         <div class="w-card" data-p="${esc(prompt)}">
             <div class="w-card-t">${emoji} ${esc(title)}</div>
             <div class="w-card-d">${esc(desc)}</div>
@@ -291,7 +308,6 @@ function renderWelcome() {
             <div class="w-cards">${cards}</div>
         </div>`;
 
-    // Delegation: um listener no container dos cards
     chatMsgs.querySelector('.w-cards').addEventListener('click', e => {
         const card = e.target.closest('.w-card');
         if (!card) return;
@@ -300,7 +316,6 @@ function renderWelcome() {
         send();
     });
 }
-
 // ─── Scroll ───────────────────────────────────────────────────────────────────
 
 function scrollDown() {
