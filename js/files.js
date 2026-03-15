@@ -219,7 +219,7 @@ function importChats() {
             _validateImport(data);
 
             const count = data.chats.length;
-            if (!confirm(`Importar ${count} chat${count !== 1 ? 's' : ''}?`)) return;
+            if (!await customConfirm(`Importar ${count} chat${count !== 1 ? 's' : ''}?`, { confirmText: 'Importar' })) return;
 
             // ─── Restaura avatar se existir no export ─────────────────────
             if (data.userAvatar && typeof data.userAvatar === 'string') {
@@ -254,8 +254,8 @@ function importChats() {
 /**
  * Remove todos os chats após confirmação do usuário.
  */
-function clearAll() {
-    if (!confirm('Excluir TODOS os chats? Esta ação não pode ser desfeita.')) return;
+async function clearAll() {
+    if (!await customConfirm('Excluir TODOS os chats? Esta ação não pode ser desfeita.', { danger: true, confirmText: 'Excluir tudo' })) return;
 
     chats    = [];
     activeId = null;
