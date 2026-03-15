@@ -157,6 +157,11 @@ async function regen() {
  */
 async function _generate(c) {
     _showTyping();
+    async function _generate(c) {
+    _showTyping();
+    updTitle('generating'); // ← adiciona aqui
+    generating = true;
+    updBtn();
     generating = true;
     updBtn();
 
@@ -175,8 +180,9 @@ async function _generate(c) {
         } else {
             _showErrorMsg(c, t0, e.message);
         }
-    } finally {
+        } finally {
         _afterGen();
+        updTitle('done'); // ← adiciona aqui
     }
 }
 
