@@ -4,7 +4,9 @@
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const MAX_IMAGE_SIZE  = 20 * 1024 * 1024; // 20 MB
 const MAX_IMAGES      = 5;
-const EXPORT_VERSION  = 2;
+const EXPORT_VERSION  = 3;                // bump: agora inclui avatar e thumbs
+const THUMB_MAX_PX    = 144;              // lado maior do thumbnail de export
+const THUMB_QUALITY   = 0.5;             // qualidade JPEG do thumbnail
 
 // SVG de fechar reutilizável
 const CLOSE_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none"
@@ -15,7 +17,7 @@ const CLOSE_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none"
 
 // ─── Conversão de arquivo ─────────────────────────────────────────────────────
 /**
- * Lê um arquivo de imagem e retorna seus dados em base64.
+ * Lê um arquivo de imagem, gera o base64 original e um thumbnail 144p.
  * @param {File} file
  * @returns {Promise<ImageData>}
  */
@@ -28,14 +30,31 @@ function imageToBase64(file) {
         const reader = new FileReader();
 
         reader.onload = () => {
-            const preview = reader.result;
-            resolve({
-                mimeType: file.type,
-                data:     preview.split(',')[1],
-                name:     file.name,
-                size:     file.size,
-                preview,
-            });
+            const img = new Image();
+
+            img.onload = () => {
+                // ─── Gera thumbnail 144p para export ─────────────────────────
+                const ratio   = Math.min(THUMB_MAX_PX / img.width, THUMB_MAX_PX / img.height, 1);
+                const canvas  = document.createElement('canvas');
+                canvas.width  = Math.round(img.width  * ratio);
+                canvas.height = Math.round(img.height * ratio);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                const previewThumb = canvas.toDataURL('image/jpeg', THUMB_QUALITY);
+
+                const preview = reader.result; // original — exibido no chat e enviado à API
+
+                resolve({
+                    mimeType:     file.type,
+                    data:         preview.split(',')[1], // base64 puro para a API
+                    name:         file.name,
+                    size:         file.size,
+                    preview,                             // full quality — só na sessão
+                    previewThumb,                        // 144p JPEG — vai pro export
+                });
+            };
+
+            img.onerror = () => reject(new Error(`Erro ao processar "${file.name}"`));
+            img.src = reader.result;
         };
 
         reader.onerror = () => reject(new Error(`Erro ao ler "${file.name}"`));
@@ -56,7 +75,6 @@ function renderAttachPreview() {
 
     if (isEmpty) { preview.innerHTML = ''; updBtn(); return; }
 
-    // Reconstrói apenas se necessário (evita reflow desnecessário)
     preview.innerHTML = pendingImages.map((img, i) => {
         const sizeKB = Math.round(img.size / 1024);
         return `<div class="attach-item" data-idx="${i}">
@@ -86,7 +104,6 @@ el('attachPreview').addEventListener('click', e => {
 /**
  * Processa uma lista de arquivos (drag-drop, input, paste).
  * Ignora não-imagens, respeita o limite de MAX_IMAGES.
- *
  * @param {FileList|File[]} files
  */
 async function handleFiles(files) {
@@ -115,26 +132,12 @@ async function handleFiles(files) {
     if (added > 0) renderAttachPreview();
 }
 
-// ─── Export ───────────────────────────────────────────────────────────────────
+// ─── Sanitização para export ──────────────────────────────────────────────────
 /**
- * Exporta todos os chats como arquivo JSON.
- * Remove dados binários das imagens (base64) para manter o arquivo leve.
+ * Substitui o preview original pelo thumbnail 144p.
+ * Remove o base64 original (data) para manter o export leve.
+ * @param {Chat} chat
  */
-function exportChats() {
-    if (!chats.length) { toast('Nada para exportar', '⚠️'); return; }
-
-    const payload = {
-        app:      'RicinusAI',
-        version:  EXPORT_VERSION,
-        exported: new Date().toISOString(),
-        chats:    chats.map(_sanitizeChatForExport),
-    };
-
-    _downloadJSON(payload, `ricinusai_${Date.now()}.json`);
-    toast('Exportado com sucesso!', '✅');
-}
-
-/** Remove dados binários das imagens de um chat para o export */
 function _sanitizeChatForExport(chat) {
     return {
         ...chat,
@@ -142,7 +145,12 @@ function _sanitizeChatForExport(chat) {
             if (!m.images?.length) return m;
             return {
                 ...m,
-                images: m.images.map(({ name, mimeType, size }) => ({ name, mimeType, size })),
+                images: m.images.map(({ name, mimeType, size, previewThumb }) => ({
+                    name,
+                    mimeType,
+                    size,
+                    preview: previewThumb ?? null, // thumb no lugar do full
+                })),
             };
         }),
     };
@@ -157,10 +165,44 @@ function _downloadJSON(data, filename) {
     URL.revokeObjectURL(url);
 }
 
+// ─── Export ───────────────────────────────────────────────────────────────────
+/**
+ * Exporta todos os chats como JSON.
+ * Inclui avatar em base64 e thumbnails 144p das imagens.
+ */
+function exportChats() {
+    if (!chats.length) { toast('Nada para exportar', '⚠️'); return; }
+
+    const payload = {
+        app:        'RicinusAI',
+        version:    EXPORT_VERSION,
+        exported:   new Date().toISOString(),
+        userAvatar: S.userAvatar ?? null,          // ← avatar incluído
+        chats:      chats.map(_sanitizeChatForExport),
+    };
+
+    _downloadJSON(payload, `ricinusai_${Date.now()}.json`);
+    toast('Exportado com sucesso!', '✅');
+}
+
 // ─── Import ───────────────────────────────────────────────────────────────────
 /**
+ * Valida estrutura básica de um arquivo de importação.
+ * @param {object} data
+ */
+function _validateImport(data) {
+    if (!data || typeof data !== 'object')  throw new Error('Arquivo inválido');
+    if (!Array.isArray(data.chats))         throw new Error('Formato inválido: "chats" ausente');
+    if (data.version > EXPORT_VERSION)      throw new Error(`Versão ${data.version} não suportada`);
+    if (data.chats.some(c => !c.id || !Array.isArray(c.messages))) {
+        throw new Error('Um ou mais chats estão corrompidos');
+    }
+}
+
+/**
  * Abre seletor de arquivo e importa chats de um JSON exportado.
- * IDs duplicados são regeneados automaticamente.
+ * Restaura avatar se presente no arquivo.
+ * IDs duplicados são regenerados automaticamente.
  */
 function importChats() {
     const input = Object.assign(document.createElement('input'), {
@@ -179,8 +221,16 @@ function importChats() {
             const count = data.chats.length;
             if (!confirm(`Importar ${count} chat${count !== 1 ? 's' : ''}?`)) return;
 
+            // ─── Restaura avatar se existir no export ─────────────────────
+            if (data.userAvatar && typeof data.userAvatar === 'string') {
+                updateSettings({ userAvatar: data.userAvatar });
+                loadAvatarPreview();
+                toast('Avatar restaurado!', '🖼️');
+            }
+
+            // ─── Importa chats sem colidir com IDs existentes ─────────────
             const existingIds = new Set(chats.map(c => c.id));
-            const imported = data.chats.map(c => ({
+            const imported    = data.chats.map(c => ({
                 ...c,
                 id: existingIds.has(c.id) ? uid() : c.id,
             }));
@@ -198,20 +248,6 @@ function importChats() {
     });
 
     input.click();
-}
-
-/**
- * Valida estrutura básica de um arquivo de importação.
- * Lança Error descritivo se inválido.
- * @param {object} data
- */
-function _validateImport(data) {
-    if (!data || typeof data !== 'object')    throw new Error('Arquivo inválido');
-    if (!Array.isArray(data.chats))           throw new Error('Formato inválido: "chats" ausente');
-    if (data.version > EXPORT_VERSION)        throw new Error(`Versão ${data.version} não suportada`);
-    if (data.chats.some(c => !c.id || !Array.isArray(c.messages))) {
-        throw new Error('Um ou mais chats estão corrompidos');
-    }
 }
 
 // ─── Limpar tudo ──────────────────────────────────────────────────────────────
