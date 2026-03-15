@@ -192,10 +192,19 @@ function exportChats() {
  */
 function _validateImport(data) {
     if (!data || typeof data !== 'object')  throw new Error('Arquivo inválido');
-    if (!Array.isArray(data.chats))         throw new Error('Formato inválido: "chats" ausente');
-    if (data.version > EXPORT_VERSION)      throw new Error(`Versão ${data.version} não suportada`);
+    if (!Array.isArray(data.chats))         throw new Error('Formato inválido');
+    if (data.version > EXPORT_VERSION)      throw new Error(`Versão não suportada`);
     if (data.chats.some(c => !c.id || !Array.isArray(c.messages))) {
         throw new Error('Um ou mais chats estão corrompidos');
+    }
+
+    // Garante que title e content são sempre strings
+    for (const chat of data.chats) {
+        if (typeof chat.title !== 'string') throw new Error('Título inválido em um chat');
+        for (const msg of chat.messages) {
+            if (!['user', 'model'].includes(msg.role)) throw new Error('Role inválido em mensagem');
+            if (typeof msg.content !== 'string')       throw new Error('Conteúdo inválido em mensagem');
+        }
     }
 }
 
