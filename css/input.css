@@ -58,11 +58,12 @@
     padding: 5px 0;
     font-family: inherit;
     transition: color .15s;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
 
-    /* Scroll suave ao crescer */
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+.input-box textarea::-webkit-scrollbar {
+    display: none;
 }
 
 .input-box textarea::placeholder {
