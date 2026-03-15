@@ -27,19 +27,17 @@ const TOAST_DURATION = 3000;
 function toast(msg, icon = 'ℹ️') {
     const t = document.createElement('div');
     t.className = 'toast';
-    t.setAttribute('role', 'status');        // acessibilidade: screen readers lêem automaticamente
+    t.setAttribute('role', 'status');
     t.setAttribute('aria-live', 'polite');
     t.innerHTML = `<span aria-hidden="true">${icon}</span><span>${esc(msg)}</span>`;
     toastsEl.appendChild(t);
 
-    // Limpa pelo timeout E pela animação CSS (o que vier primeiro)
     const cleanup = () => { if (t.isConnected) t.remove(); };
     t.addEventListener('animationend', cleanup, { once: true });
     setTimeout(cleanup, TOAST_DURATION);
 }
 
 // ─── Escape HTML ──────────────────────────────────────────────────────────────
-// Cache do nó de escape — reutilizado em vez de recriado a cada chamada
 const _escNode = document.createElement('div');
 
 /**
@@ -67,10 +65,8 @@ function wordCount(text) {
 
 // ─── Markdown → HTML ──────────────────────────────────────────────────────────
 
-// Tags de bloco que não devem ser envolvidas em <p>
 const _BLOCK_TAGS = ['h1','h2','h3','ul','ol','div','blockquote','hr','pre'];
 
-// Regex pré-compiladas (evita recompilação a cada chamada de md())
 const _RE = {
     codeBlock:   /```(\w*)\n([\s\S]*?)```/g,
     inlineCode:  /`([^`]+)`/g,
@@ -189,10 +185,6 @@ function md(text) {
 }
 
 // ─── Avatares SVG ─────────────────────────────────────────────────────────────
-/**
- * SVG.userAvatar é um getter para sempre refletir S.userAvatar atualizado.
- * SVG.botAvatar é estático.
- */
 const SVG = {
     get userAvatar() {
         if (S.userAvatar) {
@@ -217,10 +209,6 @@ const SVG = {
 };
 
 // ─── API global para botões gerados via innerHTML ─────────────────────────────
-/**
- * Exposto em window.R para uso nos atributos onclick de código gerado dinamicamente
- * (blocos de código e lightbox de imagens).
- */
 window.R = {
     /** Copia o conteúdo do bloco de código mais próximo ao botão clicado. */
     copyEl(btn) {
