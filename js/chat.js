@@ -183,4 +183,5 @@ function _setActive(id) {
     save();
     renderList();
     renderMsgs();
+    updTitle('idle'); // ← adiciona aqui
 }
