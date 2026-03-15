@@ -1,58 +1,108 @@
 /* ═══════════ SEND & STREAMING ═══════════ */
 'use strict';
 
-const MEDICAL_KEYWORDS = [
-    'remédio', 'medicamento', 'medicina', 'médico', 'diagnóstico',
-    'diagnose', 'doença', 'sintoma', 'tratamento', 'dose', 'dosagem',
-    'bula', 'receita', 'prescrição', 'farmácia', 'antibiótico',
-    'analgésico', 'anti-inflamatório', 'vacina', 'cirurgia', 'exame',
-    'hospital', 'clínica', 'consulta', 'dor', 'febre', 'infecção',
-    'vírus', 'bactéria', 'câncer', 'tumor', 'diabetes', 'pressão alta',
-    'depressão', 'ansiedade', 'psiquiatra', 'psicólogo', 'terapia'
+// ─── Detecção de dados sensíveis ──────────────────────────────────────────────
+const SENSITIVE_PATTERNS = [
+    /\d{3}[\.\s]?\d{3}[\.\s]?\d{3}[-\.\s]?\d{2}/,          // CPF
+    /\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}/,            // Cartão
+    /(senha|password|secret)\s*[:=]\s*\S+/i,                 // Credencial
 ];
-
-function checkMedicalContent(text) {
-    const lower = text.toLowerCase();
-    return MEDICAL_KEYWORDS.some(k => lower.includes(k));
-}
-
-const LEGAL_KEYWORDS = [
-    'processo', 'contrato', 'advogado', 'lei', 'crime', 'tribunal',
-    'juiz', 'sentença', 'recurso', 'ação judicial', 'direito', 'multa',
-    'indenização', 'réu', 'autor', 'petição', 'liminar', 'mandado',
-    'delegacia', 'boletim de ocorrência', 'divórcio', 'herança', 'testamento'
-];
-
-function checkLegalContent(text) {
-    const lower = text.toLowerCase();
-    return LEGAL_KEYWORDS.some(k => lower.includes(k));
-}
 
 function checkSensitiveData(text) {
-    const cpf = /\d{3}[\.\s]?\d{3}[\.\s]?\d{3}[-\.\s]?\d{2}/;
-    const cartao = /\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}/;
-    const senha = /(senha|password|secret)\s*[:=]\s*\S+/i;
-    return cpf.test(text) || cartao.test(text) || senha.test(text);
+    return SENSITIVE_PATTERNS.some(p => p.test(text));
 }
 
+// ─── Typing indicator ─────────────────────────────────────────────────────────
+function _showTyping() {
+    const div = document.createElement('div');
+    div.className = 'msg';
+    div.id        = 'typInd';
+    div.innerHTML = `
+        <div class="msg-av a">${SVG.botAvatar}</div>
+        <div class="msg-body">
+            <div class="msg-name">RicinusAI</div>
+            <div class="typing">
+                <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            </div>
+        </div>`;
+    chatMsgs.appendChild(div);
+    scrollDown();
+}
+
+function _removeTyping() {
+    document.getElementById('typInd')?.remove();
+}
+
+// ─── Helpers de geração ───────────────────────────────────────────────────────
+function _elapsedSec(t0) {
+    return ((Date.now() - t0) / 1000).toFixed(1);
+}
+
+function _buildModelMsg(txt, think, u, t0, keyUsed) {
+    return {
+        role:     'model',
+        content:  txt,
+        thinking: think || null,
+        meta: {
+            inTok:    u.promptTokenCount,
+            outTok:   u.candidatesTokenCount,
+            thinkTok: u.thoughtsTokenCount,
+            dur:      _elapsedSec(t0),
+            model:    S.model,
+            keyUsed,
+        },
+    };
+}
+
+/**
+ * Lógica comum ao finalizar uma geração (send e regen).
+ * Limpa estado, persiste e atualiza UI.
+ */
+function _afterGen() {
+    generating = false;
+    aborter    = null;
+    updBtn();
+    save();
+    renderList();
+    scrollDown();
+}
+
+/**
+ * Exibe uma mensagem de erro inline no chat e mostra um toast.
+ * @param {Chat} c
+ * @param {number} t0
+ * @param {string} errText
+ */
+function _showErrorMsg(c, t0, errText) {
+    const msg = {
+        role:    'model',
+        content: `❌ **Erro:** ${errText}`,
+        meta:    { dur: _elapsedSec(t0) },
+    };
+    c.messages.push(msg);
+    addMsgDOM(msg, c.messages.length - 1);
+    toast('Nossos servidores estão enfrentando instabilidades. Tente novamente.', '⚠️');
+}
+
+// ─── Envio principal ──────────────────────────────────────────────────────────
 async function send() {
-    const inp = el('inp');
+    const inp  = el('inp');
     const text = inp.value.trim();
 
     if ((!text && pendingImages.length === 0) || generating) return;
     if (!getValidKeys().length) { toast('Configure uma chave API', '⚠️'); openSet(); return; }
 
     if (checkSensitiveData(text)) {
-        const confirma = confirm('⚠️ Detectamos o que pode ser um dado sensível (CPF, cartão ou senha) na sua mensagem. Deseja enviar mesmo assim?');
-        if (!confirma) return;
+        if (!confirm('⚠️ Detectamos o que pode ser um dado sensível (CPF, cartão ou senha). Deseja enviar mesmo assim?')) return;
     }
 
-    let c = active();
-    if (!c) c = newChat();
+    // Garante chat ativo
+    let c = active() ?? newChat();
 
+    // Monta e adiciona mensagem do usuário
     const uMsg = { role: 'user', content: text };
     if (pendingImages.length > 0) {
-        uMsg.images = [...pendingImages];
+        uMsg.images  = [...pendingImages];
         pendingImages = [];
         renderAttachPreview();
     }
@@ -60,119 +110,102 @@ async function send() {
     autoTitle(c);
     save();
 
-    inp.value = '';
+    // Limpa o input
+    inp.value        = '';
     inp.style.height = 'auto';
     updBtn();
     updCharCount();
 
+    // Renderiza a mensagem do usuário
     if (chatMsgs.querySelector('.welcome')) chatMsgs.innerHTML = '';
     addMsgDOM(uMsg, c.messages.length - 1);
-
-    // Alertas médico e jurídico aparecem após a mensagem do usuário
-    if (checkMedicalContent(text)) {
-        toast('⚕️ Consulte sempre um profissional de saúde.', 'ℹ️');
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'medical-alert';
-        alertDiv.innerHTML = `<span>⚕️</span><span>As informações abaixo são de caráter informativo. Consulte sempre um médico ou profissional de saúde habilitado antes de tomar qualquer decisão clínica.</span>`;
-        chatMsgs.appendChild(alertDiv);
-    }
-
-    if (checkLegalContent(text)) {
-        toast('⚖️ Consulte sempre um advogado para questões jurídicas.', 'ℹ️');
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'legal-alert';
-        alertDiv.innerHTML = `<span>⚖️</span><span>As informações abaixo são de caráter informativo. Consulte sempre um advogado habilitado antes de tomar decisões jurídicas.</span>`;
-        chatMsgs.appendChild(alertDiv);
-    }
-
     scrollDown();
 
-    // Typing indicator
-    const typDiv = document.createElement('div');
-    typDiv.className = 'msg';
-    typDiv.id = 'typInd';
-    typDiv.innerHTML = `
-        <div class="msg-av a">${SVG.botAvatar}</div>
-        <div class="msg-body">
-            <div class="msg-name">RicinusAI</div>
-            <div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-        </div>`;
-    chatMsgs.appendChild(typDiv);
-    scrollDown();
+    await _generate(c);
+}
 
+// ─── Parar geração ────────────────────────────────────────────────────────────
+function stopGen() {
+    aborter?.abort();
+}
+
+// ─── Regenerar ────────────────────────────────────────────────────────────────
+async function regen() {
+    const c = active();
+    if (!c || generating) return;
+
+    // Remove a última mensagem do modelo
+    const lastModelIdx = [...c.messages].reverse().findIndex(m => m.role === 'model');
+    if (lastModelIdx === -1) return;
+    c.messages.splice(c.messages.length - 1 - lastModelIdx, 1);
+
+    // Garante que a última mensagem restante é do usuário
+    if (c.messages.at(-1)?.role !== 'user') return;
+
+    save();
+    renderMsgs();
+
+    await _generate(c);
+}
+
+// ─── Núcleo de geração (compartilhado por send, regen e continuar) ────────────
+/**
+ * Exibe o typing indicator, chama a API e despacha para o handler correto.
+ * Centraliza o try/catch/finally que antes estava duplicado em send e regen.
+ *
+ * @param {Chat} c - chat ativo
+ */
+async function _generate(c) {
+    _showTyping();
     generating = true;
     updBtn();
+
     const t0 = Date.now();
 
     try {
         const res = await callAPI(c.messages);
-        const typ = document.getElementById('typInd');
-        if (typ) typ.remove();
+        _removeTyping();
 
-        if (res.isStream) {
-            await handleStream(res.stream, c, t0, res.keyUsed);
-        } else {
-            handleFull(res.data, c, t0, res.keyUsed);
-        }
+        if (res.isStream) await handleStream(res.stream, c, t0, res.keyUsed);
+        else               handleFull(res.data, c, t0, res.keyUsed);
     } catch (e) {
-        const typ = document.getElementById('typInd');
-        if (typ) typ.remove();
-
+        _removeTyping();
         if (e.name === 'AbortError') {
             toast('Cancelado', '🛑');
         } else {
-            const eMsg = {
-                role: 'model',
-                content: `❌ **Erro:** ${e.message}`,
-                meta: { dur: ((Date.now() - t0) / 1000).toFixed(1) }
-            };
-            c.messages.push(eMsg);
-            addMsgDOM(eMsg, c.messages.length - 1);
-            toast('Nossos servidores estão enfrentando instabilidades. Tente novamente.', '⚠️');
+            _showErrorMsg(c, t0, e.message);
         }
     } finally {
-        generating = false;
-        aborter = null;
-        updBtn();
-        save();
-        renderList();
-        scrollDown();
+        _afterGen();
     }
 }
 
+// ─── Handler: resposta completa (não-stream) ──────────────────────────────────
 function handleFull(data, c, t0, keyUsed) {
     const cand = data.candidates?.[0];
     if (!cand) {
-        const reason = data.candidates?.[0]?.finishReason;
+        const reason = cand?.finishReason;
         throw new Error(reason ? `Resposta bloqueada: ${reason}` : 'Resposta vazia');
     }
 
     let txt = '', think = '';
-    if (cand.content && cand.content.parts) {
-        for (const p of cand.content.parts) {
-            if (p.thought) think += p.text || '';
-            else txt += p.text || '';
-        }
+    for (const p of (cand.content?.parts ?? [])) {
+        if (p.thought) think += p.text ?? '';
+        else           txt   += p.text ?? '';
     }
 
-    const u = data.usageMetadata || {};
-    const dur = ((Date.now() - t0) / 1000).toFixed(1);
-    const msg = {
-        role: 'model', content: txt, thinking: think || null,
-        meta: {
-            inTok: u.promptTokenCount, outTok: u.candidatesTokenCount,
-            thinkTok: u.thoughtsTokenCount, dur, model: S.model, keyUsed
-        }
-    };
+    const msg = _buildModelMsg(txt, think, data.usageMetadata ?? {}, t0, keyUsed);
     c.messages.push(msg);
     addMsgDOM(msg, c.messages.length - 1);
     scrollDown();
 }
 
+// ─── Handler: stream SSE ──────────────────────────────────────────────────────
 async function handleStream(stream, c, t0, keyUsed) {
     let txt = '', think = '', lastU = null;
     const sid = uid();
 
+    // Monta o nó de streaming
     const d = document.createElement('div');
     d.className = 'msg';
     d.innerHTML = `
@@ -186,35 +219,33 @@ async function handleStream(stream, c, t0, keyUsed) {
                 <div class="think-body" id="stThinkB_${sid}"></div>
             </div>
             <div class="msg-text streaming" id="stTxt_${sid}"></div>
-            <div class="msg-meta" id="stMeta_${sid}" style="display:none"></div>
         </div>`;
     chatMsgs.appendChild(d);
     scrollDown();
 
-    const stTxt = el(`stTxt_${sid}`);
-    const stThink = el(`stThink_${sid}`);
+    // Referências locais para evitar getElementById repetido no loop
+    const stTxt    = el(`stTxt_${sid}`);
+    const stThink  = el(`stThink_${sid}`);
     const stThinkB = el(`stThinkB_${sid}`);
-    const stMeta = el(`stMeta_${sid}`);
-    const stThinkH = el(`stThinkH_${sid}`);
-    const stThinkAr = el(`stThinkAr_${sid}`);
 
-    if (stThinkH) {
-        stThinkH.addEventListener('click', () => {
-            stThinkB.classList.toggle('open');
-            stThinkAr.classList.toggle('open');
-        });
-    }
+    el(`stThinkH_${sid}`)?.addEventListener('click', () => {
+        stThinkB.classList.toggle('open');
+        el(`stThinkAr_${sid}`)?.classList.toggle('open');
+    });
 
+    // Loop de leitura do stream
     try {
         for await (const chunk of parseSSE(stream)) {
-            if (!chunk.candidates?.[0]?.content?.parts) continue;
-            for (const p of chunk.candidates[0].content.parts) {
+            const parts = chunk.candidates?.[0]?.content?.parts;
+            if (!parts) continue;
+
+            for (const p of parts) {
                 if (p.thought) {
-                    think += p.text || '';
+                    think += p.text ?? '';
                     stThink.style.display = 'block';
-                    stThinkB.innerHTML = md(think);
+                    stThinkB.innerHTML    = md(think);
                 } else {
-                    txt += p.text || '';
+                    txt            += p.text ?? '';
                     stTxt.innerHTML = md(txt);
                 }
             }
@@ -225,143 +256,62 @@ async function handleStream(stream, c, t0, keyUsed) {
         if (e.name !== 'AbortError') throw e;
     }
 
+    // Finaliza UI do streaming
     stTxt.classList.remove('streaming');
-    const dur = ((Date.now() - t0) / 1000).toFixed(1);
-    const u = lastU || {};
+    _appendStreamActions(d, txt, c, t0, keyUsed, lastU ?? {});
 
-    stMeta.style.display = 'none';
-    stMeta.innerHTML = '';
-
-    // Word count
-    const wc = wordCount(txt);
-    const wcDiv = document.createElement('div');
-    wcDiv.className = 'msg-word-count';
-    wcDiv.textContent = `${wc} palavra${wc !== 1 ? 's' : ''}`;
-    d.querySelector('.msg-body').insertBefore(wcDiv, stMeta.nextSibling);
-
-    // Action buttons
-    const acts = document.createElement('div');
-    acts.className = 'msg-acts';
-
-    const cpBtn = document.createElement('button');
-    cpBtn.className = 'act-btn';
-    cpBtn.textContent = '📋 Copiar';
-    cpBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(txt).then(() => {
-            cpBtn.textContent = '✅ Copiado!';
-            setTimeout(() => cpBtn.textContent = '📋 Copiar', 2000);
-        });
-    });
-
-    const rgBtn = document.createElement('button');
-    rgBtn.className = 'act-btn';
-    rgBtn.textContent = '🔄 Regenerar';
-    rgBtn.addEventListener('click', () => regen());
-
-    const contBtn = document.createElement('button');
-    contBtn.className = 'act-btn';
-    contBtn.textContent = '▶️ Continuar';
-    contBtn.addEventListener('click', async () => {
-        if (generating) return;
-        const c = active();
-        if (!c) return;
-        const lastMsg = c.messages[c.messages.length - 1];
-        if (!lastMsg || lastMsg.role !== 'model') return;
-
-        c.messages.push({ role: 'user', content: 'Continue a resposta do ponto onde parou.' });
-        contBtn.disabled = true;
-
-        generating = true;
-        updBtn();
-        const t0 = Date.now();
-        try {
-            const res = await callAPI(c.messages);
-            if (res.isStream) await handleStream(res.stream, c, t0, res.keyUsed);
-            else handleFull(res.data, c, t0, res.keyUsed);
-        } catch(e) {
-            toast(e.message, '❌');
-        } finally {
-            generating = false;
-            updBtn();
-            save();
-        }
-    });
-
-    acts.appendChild(cpBtn);
-    acts.appendChild(rgBtn);
-    acts.appendChild(contBtn);
-    d.querySelector('.msg-body').appendChild(acts);
-
-    const msg = {
-        role: 'model', content: txt, thinking: think || null,
-        meta: {
-            inTok: u.promptTokenCount, outTok: u.candidatesTokenCount,
-            thinkTok: u.thoughtsTokenCount, dur, model: S.model, keyUsed
-        }
-    };
+    // Salva mensagem no histórico
+    const msg = _buildModelMsg(txt, think, lastU ?? {}, t0, keyUsed);
     c.messages.push(msg);
 }
 
-function stopGen() {
-    if (aborter) aborter.abort();
-}
+// ─── Botões de ação pós-stream ────────────────────────────────────────────────
+function _appendStreamActions(msgNode, txt, c, t0, keyUsed, u) {
+    const body = msgNode.querySelector('.msg-body');
 
-async function regen() {
-    const c = active();
-    if (!c || c.messages.length < 2 || generating) return;
+    // Word count
+    const wc    = wordCount(txt);
+    const wcDiv = document.createElement('div');
+    wcDiv.className   = 'msg-word-count';
+    wcDiv.textContent = `${wc} palavra${wc !== 1 ? 's' : ''}`;
+    body.appendChild(wcDiv);
 
-    let lastModelIdx = -1;
-    for (let i = c.messages.length - 1; i >= 0; i--) {
-        if (c.messages[i].role === 'model') { lastModelIdx = i; break; }
-    }
-    if (lastModelIdx === -1) return;
+    // Botões
+    const acts = document.createElement('div');
+    acts.className = 'msg-acts';
 
-    c.messages.splice(lastModelIdx, 1);
-    save();
-    renderMsgs();
+    acts.innerHTML = `
+        <button class="act-btn" data-action="copy">📋 Copiar</button>
+        <button class="act-btn" data-action="regen">🔄 Regenerar</button>
+        <button class="act-btn" data-action="cont">▶️ Continuar</button>`;
 
-    const lastMsg = c.messages[c.messages.length - 1];
-    if (!lastMsg || lastMsg.role !== 'user') return;
+    acts.addEventListener('click', async e => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
 
-    const typDiv = document.createElement('div');
-    typDiv.className = 'msg';
-    typDiv.id = 'typInd';
-    typDiv.innerHTML = `
-        <div class="msg-av a">${SVG.botAvatar}</div>
-        <div class="msg-body">
-            <div class="msg-name">RicinusAI</div>
-            <div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-        </div>`;
-    chatMsgs.appendChild(typDiv);
-    scrollDown();
+        switch (btn.dataset.action) {
+            case 'copy':
+                navigator.clipboard.writeText(txt).then(() => {
+                    btn.textContent = '✅ Copiado!';
+                    setTimeout(() => { btn.textContent = '📋 Copiar'; }, 2000);
+                });
+                break;
 
-    generating = true;
-    updBtn();
-    const t0 = Date.now();
+            case 'regen':
+                regen();
+                break;
 
-    try {
-        const res = await callAPI(c.messages);
-        const typ = document.getElementById('typInd');
-        if (typ) typ.remove();
-
-        if (res.isStream) await handleStream(res.stream, c, t0, res.keyUsed);
-        else handleFull(res.data, c, t0, res.keyUsed);
-    } catch (e) {
-        const typ = document.getElementById('typInd');
-        if (typ) typ.remove();
-        if (e.name === 'AbortError') toast('Cancelado', '🛑');
-        else {
-            const eMsg = { role: 'model', content: `❌ **Erro:** ${e.message}`, meta: { dur: ((Date.now() - t0) / 1000).toFixed(1) } };
-            c.messages.push(eMsg);
-            addMsgDOM(eMsg, c.messages.length - 1);
-            toast('Nossos servidores estão enfrentando instabilidades. Tente novamente.', '⚠️');
+            case 'cont': {
+                if (generating) return;
+                const chat = active();
+                if (!chat || chat.messages.at(-1)?.role !== 'model') return;
+                chat.messages.push({ role: 'user', content: 'Continue a resposta do ponto onde parou.' });
+                btn.disabled = true;
+                await _generate(chat);
+                break;
+            }
         }
-    } finally {
-        generating = false;
-        aborter = null;
-        updBtn();
-        save();
-        renderList();
-        scrollDown();
-    }
+    });
+
+    body.appendChild(acts);
 }
