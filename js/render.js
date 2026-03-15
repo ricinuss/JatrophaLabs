@@ -125,7 +125,7 @@ function _buildSidebarItem(c) {
         </div>`;
 
     // Event delegation: um único listener cobre todos os botões
-    it.addEventListener('click', e => {
+    it.addEventListener('click', async e => {
         const btn = e.target.closest('[data-action]');
         if (!btn) { switchChat(c.id); return; }
 
@@ -133,7 +133,7 @@ function _buildSidebarItem(c) {
         switch (btn.dataset.action) {
             case 'pin': pinChat(c.id); break;
             case 'ren': renChat(c.id); break;
-            case 'del': if (confirm('Excluir este chat?')) delChat(c.id); break;
+            case 'del': if (await customConfirm('Excluir este chat?', { danger: true, confirmText: 'Excluir' })) delChat(c.id); break;
         }
     });
 
