@@ -21,6 +21,8 @@
     // Valida chave API em background (não bloqueia)
     validateKeysOnLoad();
 
+    updTitle('idle'); // ← adiciona aqui
+
     console.log('%c⚡ RicinusAI v2.0 inicializado!', 'color:#8b5cf6;font-weight:bold;font-size:14px');
 })();
 
