@@ -8,9 +8,7 @@
     document.documentElement.setAttribute('data-theme', S.theme);
     document.documentElement.style.setProperty('--font-size-chat', (S.fontSize || 14) + 'px');
 
-    // Guard: evita estado inválido no <select> se S.model for undefined
-    if (S.model) el('selModel').value = S.model;
-
+    el('selModel').value = S.model;
     updBadge();
     renderList();
     renderMsgs();
@@ -20,33 +18,16 @@
 
     el('inp').focus();
 
-    // Valida chave API em background (não bloqueia)
-    validateKeysOnLoad();
-
-    updTitle('idle');
-
     console.log('%c⚡ RicinusAI v2.0 inicializado!', 'color:#8b5cf6;font-weight:bold;font-size:14px');
 })();
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
 
-/**
- * Registra múltiplos eventos no mesmo elemento de uma vez.
- * Em modo dev, avisa no console se o elemento não for encontrado.
- */
+/** Registra múltiplos eventos no mesmo elemento de uma vez */
 function _on(target, events, handler, options) {
     const node = typeof target === 'string' ? el(target) : target;
-
-    if (!node) {
-        if (typeof target === 'string') {
-            console.warn(`_on: elemento "#${target}" não encontrado`);
-        }
-        return;
-    }
-
-    const evList = Array.isArray(events) ? events : [events];
-    for (const ev of evList) {
-        node.addEventListener(ev, handler, options);
+    for (const ev of [].concat(events)) {
+        node?.addEventListener(ev, handler, options);
     }
 }
 
@@ -112,16 +93,16 @@ _on('btnRemoveAvatar', 'click', () => {
 });
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-_on('btnNew', 'click', () => newChat());
+_on('btnNew',  'click', () => newChat());
 _on('btnMenu', 'click', toggleSidebar);
-_on(sOverlay, 'click', closeMobile);
+_on(sOverlay,  'click', closeMobile);
 
 // ─── Settings — abertura / fechamento ─────────────────────────────────────────
-_on('btnOpenSet', 'click', openSet);
-_on('btnClsSet', 'click', closeSet);
-_on('btnCancel', 'click', closeSet);
-_on('btnSave', 'click', saveSet);
-_on('btnReset', 'click', resetSet);
+_on('btnOpenSet', 'click',  openSet);
+_on('btnClsSet',  'click',  closeSet);
+_on('btnCancel',  'click',  closeSet);
+_on('btnSave',    'click',  saveSet);
+_on('btnReset',   'click',  resetSet);
 
 _on(setModal, 'click', e => { if (e.target === setModal) closeSet(); });
 
@@ -188,28 +169,17 @@ _on('fileInput', 'change', e => {
 });
 
 // ─── Drag & Drop ──────────────────────────────────────────────────────────────
-
-// Contador para ignorar eventos disparados por elementos filhos
-let _dragDepth = 0;
-
 _on(document, 'dragover', e => {
     e.preventDefault();
+    el('dropOverlay').classList.add('show');
 });
 
-_on(document, 'dragenter', e => {
-    e.preventDefault();
-    _dragDepth++;
-    if (_dragDepth === 1) el('dropOverlay').classList.add('show');
-});
-
-_on(document, 'dragleave', () => {
-    _dragDepth--;
-    if (_dragDepth === 0) el('dropOverlay').classList.remove('show');
+_on(document, 'dragleave', e => {
+    if (e.relatedTarget === null) el('dropOverlay').classList.remove('show');
 });
 
 _on(document, 'drop', e => {
     e.preventDefault();
-    _dragDepth = 0;
     el('dropOverlay').classList.remove('show');
     if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
 });
@@ -220,10 +190,7 @@ function _closeLightbox() {
     el('lbImg').src = '';
 }
 
-// FIX: verifica se o clique foi no backdrop (não na imagem em si)
-_on('lightbox', 'click', e => {
-    if (e.target === e.currentTarget) _closeLightbox();
-});
+_on('lightbox', 'click', _closeLightbox);
 
 // ─── Atalhos de teclado ───────────────────────────────────────────────────────
 _on(document, 'keydown', e => {
