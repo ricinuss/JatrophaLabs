@@ -88,16 +88,20 @@ function renderAttachPreview() {
     updBtn();
 }
 
-// Event delegation: um único listener no container
-el('attachPreview').addEventListener('click', e => {
-    const btn = e.target.closest('.attach-rm');
-    if (!btn) return;
-    const idx = Number(btn.dataset.idx);
-    if (!isNaN(idx)) {
-        pendingImages.splice(idx, 1);
-        renderAttachPreview();
-        updBtn();
-    }
+// FIX: listener registrado em DOMContentLoaded — evita TypeError se o módulo
+// for parseado antes do DOM estar pronto
+document.addEventListener('DOMContentLoaded', () => {
+    // Event delegation: um único listener no container
+    el('attachPreview').addEventListener('click', e => {
+        const btn = e.target.closest('.attach-rm');
+        if (!btn) return;
+        const idx = Number(btn.dataset.idx);
+        if (!isNaN(idx)) {
+            pendingImages.splice(idx, 1);
+            renderAttachPreview();
+            updBtn();
+        }
+    });
 });
 
 // ─── Processamento de arquivos recebidos ──────────────────────────────────────
@@ -107,12 +111,16 @@ el('attachPreview').addEventListener('click', e => {
  * @param {FileList|File[]} files
  */
 async function handleFiles(files) {
-    const slots = MAX_IMAGES - pendingImages.length;
-    if (slots <= 0) { toast(`Máximo ${MAX_IMAGES} imagens por mensagem`, '⚠️'); return; }
+    if (pendingImages.length >= MAX_IMAGES) {
+        toast(`Máximo ${MAX_IMAGES} imagens por mensagem`, '⚠️');
+        return;
+    }
 
     let added = 0;
 
-    for (const file of [...files].slice(0, slots + pendingImages.length)) {
+    // FIX: slice direto em MAX_IMAGES — slots + pendingImages.length simplificava
+    // para MAX_IMAGES de qualquer forma, mas o código anterior era enganoso
+    for (const file of [...files].slice(0, MAX_IMAGES)) {
         if (pendingImages.length >= MAX_IMAGES) {
             toast(`Máximo ${MAX_IMAGES} imagens por mensagem`, '⚠️');
             break;
@@ -156,12 +164,20 @@ function _sanitizeChatForExport(chat) {
     };
 }
 
-/** Cria um link temporário e dispara o download de um objeto JSON */
+/**
+ * Cria um link temporário, insere no DOM e dispara o download de um objeto JSON.
+ * FIX: elemento inserido no DOM antes do click() — necessário para Firefox.
+ * @param {object} data
+ * @param {string} filename
+ */
 function _downloadJSON(data, filename) {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
 
@@ -177,7 +193,7 @@ function exportChats() {
         app:        'RicinusAI',
         version:    EXPORT_VERSION,
         exported:   new Date().toISOString(),
-        userAvatar: S.userAvatar ?? null,          // ← avatar incluído
+        userAvatar: S.userAvatar ?? null,
         chats:      chats.map(_sanitizeChatForExport),
     };
 
@@ -191,19 +207,31 @@ function exportChats() {
  * @param {object} data
  */
 function _validateImport(data) {
-    if (!data || typeof data !== 'object')  throw new Error('Arquivo inválido');
-    if (!Array.isArray(data.chats))         throw new Error('Formato inválido');
-    if (data.version > EXPORT_VERSION)      throw new Error(`Versão não suportada`);
+    if (!data || typeof data !== 'object') throw new Error('Arquivo inválido');
+    if (!Array.isArray(data.chats))        throw new Error('Formato inválido');
+    if (data.version > EXPORT_VERSION)     throw new Error('Versão não suportada');
+
+    // Retrocompatibilidade: arquivos sem version são aceitos com aviso
+    if (data.version === undefined) {
+        console.warn('importChats: arquivo sem campo version — assumindo compatível');
+    }
+
     if (data.chats.some(c => !c.id || !Array.isArray(c.messages))) {
         throw new Error('Um ou mais chats estão corrompidos');
     }
 
-    // Garante que title e content são sempre strings
     for (const chat of data.chats) {
         if (typeof chat.title !== 'string') throw new Error('Título inválido em um chat');
+
         for (const msg of chat.messages) {
-            if (!['user', 'model'].includes(msg.role)) throw new Error('Role inválido em mensagem');
-            if (typeof msg.content !== 'string')       throw new Error('Conteúdo inválido em mensagem');
+            if (!['user', 'model'].includes(msg.role)) {
+                throw new Error('Role inválido em mensagem');
+            }
+
+            // FIX: aceita content como string OU array (mensagens multimodais com imagens)
+            if (typeof msg.content !== 'string' && !Array.isArray(msg.content)) {
+                throw new Error('Conteúdo inválido em mensagem');
+            }
         }
     }
 }
@@ -228,10 +256,17 @@ function importChats() {
             _validateImport(data);
 
             const count = data.chats.length;
-            if (!await customConfirm(`Importar ${count} chat${count !== 1 ? 's' : ''}?`, { confirmText: 'Importar' })) return;
+            if (!await customConfirm(
+                `Importar ${count} chat${count !== 1 ? 's' : ''}?`,
+                { confirmText: 'Importar' }
+            )) return;
 
-            // ─── Restaura avatar se existir no export ─────────────────────
-            if (data.userAvatar && typeof data.userAvatar === 'string') {
+            // ─── Restaura avatar com validação de formato ─────────────────
+            // FIX: aceita apenas data URIs de imagem — evita injeção arbitrária
+            if (
+                typeof data.userAvatar === 'string' &&
+                data.userAvatar.startsWith('data:image/')
+            ) {
                 updateSettings({ userAvatar: data.userAvatar });
                 loadAvatarPreview();
                 toast('Avatar restaurado!', '🖼️');
@@ -264,7 +299,10 @@ function importChats() {
  * Remove todos os chats após confirmação do usuário.
  */
 async function clearAll() {
-    if (!await customConfirm('Excluir TODOS os chats? Esta ação não pode ser desfeita.', { danger: true, confirmText: 'Excluir tudo' })) return;
+    if (!await customConfirm(
+        'Excluir TODOS os chats? Esta ação não pode ser desfeita.',
+        { danger: true, confirmText: 'Excluir tudo' }
+    )) return;
 
     chats    = [];
     activeId = null;
