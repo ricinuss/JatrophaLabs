@@ -20,7 +20,7 @@ const SVG_ICONS = {
 
 // Cards de sugestão da tela de boas-vindas
 const WELCOME_CARDS = [
-    // ═══════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════
     // 💻 CÓDIGO - JAVASCRIPT/TYPESCRIPT
     // ═══════════════════════════════════════════════════════════════
     { emoji: '💻', title: 'Código JS',           desc: 'Ordenar array',           prompt: 'Escreva uma função JavaScript para ordenar um array de objetos por uma propriedade específica' },
@@ -338,6 +338,25 @@ const TIME_GROUPS = [
     { label: 'Antigos', maxMs: Infinity },
 ];
 
+// FIX: contador global para IDs únicos de blocos de pensamento
+// — evita colisões que causariam toggle do bloco errado
+let _thinkIdCounter = 0;
+
+// ─── Helpers de conteúdo multimodal ──────────────────────────────────────────
+
+/**
+ * Extrai o texto puro de um content que pode ser string ou array de blocos.
+ * Centralizado aqui para evitar repetição em filter, copy, wordcount, etc.
+ * @param {string|Array} content
+ * @returns {string}
+ */
+function _extractText(content) {
+    if (Array.isArray(content)) {
+        return content.find(b => b.type === 'text')?.text ?? '';
+    }
+    return content ?? '';
+}
+
 // ─── Lista de chats (sidebar) ─────────────────────────────────────────────────
 
 /**
@@ -345,7 +364,7 @@ const TIME_GROUPS = [
  * Separa fixados de não-fixados e agrupa estes por período.
  */
 function renderList() {
-    const sList = el('sList');
+    const sList   = el('sList');
     const filtered = _filterChats();
 
     if (!filtered.length) {
@@ -381,20 +400,23 @@ function renderList() {
     sList.appendChild(frag);
 }
 
-/** Filtra chats pelo searchFilter atual */
+/**
+ * Filtra chats pelo searchFilter atual.
+ * FIX: suporte a content multimodal (array de blocos) via _extractText
+ */
 function _filterChats() {
     if (!searchFilter) return chats;
     const q = searchFilter.toLowerCase();
     return chats.filter(c =>
         c.title.toLowerCase().includes(q) ||
-        c.messages.some(m => m.content?.toLowerCase().includes(q))
+        c.messages.some(m => _extractText(m.content).toLowerCase().includes(q))
     );
 }
 
 /** Cria e anexa um label de grupo (ex: "Hoje", "📌 Fixados") */
 function _appendGroupLabel(parent, text) {
     const g = document.createElement('div');
-    g.className  = 's-group';
+    g.className   = 's-group';
     g.textContent = text;
     parent.appendChild(g);
 }
@@ -436,7 +458,11 @@ function _buildSidebarItem(c) {
         switch (btn.dataset.action) {
             case 'pin': pinChat(c.id); break;
             case 'ren': renChat(c.id); break;
-            case 'del': if (await customConfirm('Excluir este chat?', { danger: true, confirmText: 'Excluir' })) delChat(c.id); break;
+            case 'del':
+                if (await customConfirm('Excluir este chat?', { danger: true, confirmText: 'Excluir' })) {
+                    delChat(c.id);
+                }
+                break;
         }
     });
 
@@ -486,7 +512,7 @@ function _buildMsgNode(m, msgIdx) {
             <div class="msg-name">${isUser ? 'Você' : 'RicinusAI'}</div>
             ${_buildImagesHTML(m.images)}
             ${_buildThinkHTML(m.thinking, m.meta)}
-            <div class="msg-text">${isUser ? esc(m.content) : md(m.content)}</div>
+            <div class="msg-text">${isUser ? esc(_extractText(m.content)) : md(_extractText(m.content))}</div>
             ${_buildWordCountHTML(m.content)}
             <div class="msg-acts">
                 <button class="act-btn" data-action="copy">📋 Copiar</button>
@@ -506,16 +532,18 @@ function _buildImagesHTML(images) {
     if (!images?.length) return '';
     const imgs = images
         .filter(img => img.preview)
-        .map(img => `<img src="${img.preview}" alt="${esc(img.name || 'imagem')}"
-            onclick="R.openLightbox(this.src)">`)
+        .map(img => `<img src="${img.preview}" alt="${esc(img.name || 'imagem')}" data-lightbox>`)
         .join('');
     return imgs ? `<div class="msg-images">${imgs}</div>` : '';
 }
 
 function _buildThinkHTML(thinking, meta) {
     if (!thinking) return '';
-    const tid = 't' + Math.random().toString(36).slice(2, 8);
+
+    // FIX: contador incremental — elimina risco de colisão de IDs
+    const tid = 'think_' + (_thinkIdCounter++);
     const dur = meta?.dur ? `<span class="think-dur">${meta.dur}s</span>` : '';
+
     return `
         <div class="think-box">
             <div class="think-head" data-tid="${tid}">
@@ -525,8 +553,12 @@ function _buildThinkHTML(thinking, meta) {
         </div>`;
 }
 
+/**
+ * FIX: usa _extractText para suportar content multimodal
+ * — evita NaN ou crash quando wordCount() recebe um array
+ */
 function _buildWordCountHTML(content) {
-    const wc = wordCount(content);
+    const wc = wordCount(_extractText(content));
     return `<div class="msg-word-count">${wc} palavra${wc !== 1 ? 's' : ''}</div>`;
 }
 
@@ -534,7 +566,6 @@ function _buildWordCountHTML(content) {
 
 /**
  * Registra todos os listeners de uma mensagem via event delegation.
- * Um único listener no container substitui os 4–5 individuais.
  */
 function _bindMsgEvents(node, m, msgIdx, isUser, chat) {
     // Toggle do bloco de pensamento
@@ -544,6 +575,11 @@ function _bindMsgEvents(node, m, msgIdx, isUser, chat) {
         el('ar_' + tid)?.classList.toggle('open');
     });
 
+    // FIX: lightbox via addEventListener — remove dependência de global R.openLightbox
+    node.querySelectorAll('img[data-lightbox]').forEach(img => {
+        img.addEventListener('click', () => openLightbox(img.src));
+    });
+
     // Delegation para os botões de ação
     node.querySelector('.msg-acts').addEventListener('click', e => {
         const btn = e.target.closest('[data-action]');
@@ -551,7 +587,8 @@ function _bindMsgEvents(node, m, msgIdx, isUser, chat) {
 
         switch (btn.dataset.action) {
             case 'copy':
-                navigator.clipboard.writeText(m.content ?? '').then(() => {
+                // FIX: usa _extractText — evita copiar "[object Object]" em mensagens multimodais
+                navigator.clipboard.writeText(_extractText(m.content)).then(() => {
                     btn.textContent = '✅ Copiado!';
                     setTimeout(() => { btn.textContent = '📋 Copiar'; }, 2000);
                 });
@@ -601,13 +638,26 @@ function renderWelcome() {
     chatMsgs.querySelector('.w-cards').addEventListener('click', e => {
         const card = e.target.closest('.w-card');
         if (!card) return;
-        el('inp').value = card.dataset.p;
-        updBtn();
+
+        const inp = el('inp');
+        inp.value = card.dataset.p;
+
+        // FIX: dispara 'input' para acionar auto-resize e updCharCount antes do send()
+        inp.dispatchEvent(new Event('input'));
         send();
     });
 }
+
 // ─── Scroll ───────────────────────────────────────────────────────────────────
 
+// FIX: flag de rAF pendente — evita empilhar múltiplos frames em chamadas rápidas
+let _scrollPending = false;
+
 function scrollDown() {
-    requestAnimationFrame(() => { chatWrap.scrollTop = chatWrap.scrollHeight; });
+    if (_scrollPending) return;
+    _scrollPending = true;
+    requestAnimationFrame(() => {
+        chatWrap.scrollTop = chatWrap.scrollHeight;
+        _scrollPending = false;
+    });
 }
