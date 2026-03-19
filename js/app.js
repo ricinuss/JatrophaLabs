@@ -8,7 +8,9 @@
     document.documentElement.setAttribute('data-theme', S.theme);
     document.documentElement.style.setProperty('--font-size-chat', (S.fontSize || 14) + 'px');
 
-    el('selModel').value = S.model;
+    // Guard: evita estado inválido no <select> se S.model for undefined
+    if (S.model) el('selModel').value = S.model;
+
     updBadge();
     renderList();
     renderMsgs();
@@ -21,18 +23,30 @@
     // Valida chave API em background (não bloqueia)
     validateKeysOnLoad();
 
-    updTitle('idle'); // ← adiciona aqui
+    updTitle('idle');
 
     console.log('%c⚡ RicinusAI v2.0 inicializado!', 'color:#8b5cf6;font-weight:bold;font-size:14px');
 })();
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
 
-/** Registra múltiplos eventos no mesmo elemento de uma vez */
+/**
+ * Registra múltiplos eventos no mesmo elemento de uma vez.
+ * Em modo dev, avisa no console se o elemento não for encontrado.
+ */
 function _on(target, events, handler, options) {
     const node = typeof target === 'string' ? el(target) : target;
-    for (const ev of [].concat(events)) {
-        node?.addEventListener(ev, handler, options);
+
+    if (!node) {
+        if (typeof target === 'string') {
+            console.warn(`_on: elemento "#${target}" não encontrado`);
+        }
+        return;
+    }
+
+    const evList = Array.isArray(events) ? events : [events];
+    for (const ev of evList) {
+        node.addEventListener(ev, handler, options);
     }
 }
 
@@ -113,9 +127,9 @@ _on(setModal, 'click', e => { if (e.target === setModal) closeSet(); });
 
 // ─── Sliders de configuração ──────────────────────────────────────────────────
 const SLIDERS = [
-    { sl: 'tempSl', val: 'tempV', fmt: v => parseFloat(v).toFixed(1) },
-    { sl: 'tokSl',  val: 'tokV',  fmt: v => v },
-    { sl: 'topSl',  val: 'topV',  fmt: v => parseFloat(v).toFixed(2) },
+    { sl: 'tempSl',  val: 'tempV',  fmt: v => parseFloat(v).toFixed(1) },
+    { sl: 'tokSl',   val: 'tokV',   fmt: v => v },
+    { sl: 'topSl',   val: 'topV',   fmt: v => parseFloat(v).toFixed(2) },
     { sl: 'thinkSl', val: 'thinkV', fmt: v => v },
     {
         sl: 'fontSl', val: 'fontV', fmt: v => v + 'px',
@@ -137,7 +151,7 @@ _on('thinkTog', 'change', function () {
 
 // ─── Modo API ─────────────────────────────────────────────────────────────────
 _on('apiModeDefault', 'click', () => setApiMode('default'));
-_on('apiModeCustom', 'click', () => setApiMode('custom'));
+_on('apiModeCustom',  'click', () => setApiMode('custom'));
 
 _on('btnAddKey', 'click', () => {
     if (S.apiMode !== 'custom') return;
@@ -149,7 +163,7 @@ _on('btnAddKey', 'click', () => {
 // ─── Import / Export / Limpar ─────────────────────────────────────────────────
 _on('btnExport', 'click', exportChats);
 _on('btnImport', 'click', importChats);
-_on('btnClear', 'click', clearAll);
+_on('btnClear',  'click', clearAll);
 
 // ─── Scroll para o fim ────────────────────────────────────────────────────────
 _on(btnScrollBottom, 'click', () => scrollDown());
@@ -174,17 +188,28 @@ _on('fileInput', 'change', e => {
 });
 
 // ─── Drag & Drop ──────────────────────────────────────────────────────────────
+
+// Contador para ignorar eventos disparados por elementos filhos
+let _dragDepth = 0;
+
 _on(document, 'dragover', e => {
     e.preventDefault();
-    el('dropOverlay').classList.add('show');
 });
 
-_on(document, 'dragleave', e => {
-    if (e.relatedTarget === null) el('dropOverlay').classList.remove('show');
+_on(document, 'dragenter', e => {
+    e.preventDefault();
+    _dragDepth++;
+    if (_dragDepth === 1) el('dropOverlay').classList.add('show');
+});
+
+_on(document, 'dragleave', () => {
+    _dragDepth--;
+    if (_dragDepth === 0) el('dropOverlay').classList.remove('show');
 });
 
 _on(document, 'drop', e => {
     e.preventDefault();
+    _dragDepth = 0;
     el('dropOverlay').classList.remove('show');
     if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
 });
@@ -195,12 +220,15 @@ function _closeLightbox() {
     el('lbImg').src = '';
 }
 
-_on('lightbox', 'click', _closeLightbox);
+// FIX: verifica se o clique foi no backdrop (não na imagem em si)
+_on('lightbox', 'click', e => {
+    if (e.target === e.currentTarget) _closeLightbox();
+});
 
 // ─── Atalhos de teclado ───────────────────────────────────────────────────────
 _on(document, 'keydown', e => {
     if (e.ctrlKey && e.shiftKey && e.key === 'N') { e.preventDefault(); newChat(); return; }
-    if (e.ctrlKey && e.key === '/')              { e.preventDefault(); toggleSidebar(); return; }
+    if (e.ctrlKey && e.key === '/')               { e.preventDefault(); toggleSidebar(); return; }
 
     if (e.key === 'Escape') {
         el('lightbox').classList.contains('show') ? _closeLightbox() : closeSet();
