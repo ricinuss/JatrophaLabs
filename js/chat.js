@@ -74,18 +74,17 @@ function delChat(id) {
 }
 
 /**
- * Renomeia um chat via modal customizado.
+ * Renomeia um chat via prompt nativo.
  * @param {string} id
  */
-async function renChat(id) {
+function renChat(id) {
     const c = chats.find(x => x.id === id);
     if (!c) return;
 
-    const raw = (await customPrompt('Renomear chat', c.title, { placeholder: 'Nome do chat...' }))?.trim();
-    if (!raw) return;
+    const name = prompt('Novo nome:', c.title)?.trim();
+    if (!name) return;
 
-    // FIX: aplica limite de tamanho para evitar títulos gigantes
-    c.title = raw.substring(0, TITLE_MAX_LEN);
+    c.title = name;
     save();
     renderList();
 }
@@ -123,8 +122,6 @@ function forkChat(chatId, msgIdx) {
 
     chats.unshift(c);
     _setActive(c.id);
-    // FIX: consistência com newChat — foca o input após fork
-    el('inp').focus();
     toast('Chat bifurcado!', '🔀');
 }
 
@@ -139,50 +136,37 @@ function forkChat(chatId, msgIdx) {
 function autoTitle(c) {
     if (!c || c.title !== 'Novo Chat' || !c.messages.length) return;
 
-    // FIX: suporte a mensagens multimodais (content pode ser array de blocos)
-    const raw = c.messages[0].content;
-    const firstText = Array.isArray(raw)
-        ? (raw.find(b => b.type === 'text')?.text ?? '')
-        : (raw ?? '');
-
+    const firstText = c.messages[0].content ?? '';
     c.title = firstText.length > TITLE_MAX_LEN
         ? firstText.substring(0, TITLE_MAX_LEN) + '…'
-        : firstText || 'Novo Chat'; // fallback se não houver texto (ex: só imagem)
+        : firstText;
 
     save();
     renderList();
 }
 
 /**
- * Abre modal para editar uma mensagem do usuário.
+ * Abre prompt para editar uma mensagem do usuário.
  * Trunca o histórico a partir desse ponto e reenvia.
  *
  * @param {Chat}   chat
  * @param {number} msgIdx
  */
-async function editMessage(chat, msgIdx) {
+function editMessage(chat, msgIdx) {
     if (!chat || generating) return;
 
     const m = chat.messages[msgIdx];
     if (!m || m.role !== 'user') return;
 
-    const newContent = (await customPrompt('Editar mensagem', m.content, { placeholder: 'Mensagem...' }))?.trim();
+    const newContent = prompt('Editar mensagem:', m.content)?.trim();
     if (!newContent) return;
-
-    // FIX: re-verifica generating após o await — uma geração pode ter iniciado
-    // enquanto o usuário estava com o modal aberto
-    if (generating) return;
 
     chat.messages = chat.messages.slice(0, msgIdx);
     save();
     renderMsgs();
 
-    const inp = el('inp');
-    inp.value = newContent;
-
-    // FIX: dispara 'input' manualmente para acionar auto-resize e updCharCount
-    inp.dispatchEvent(new Event('input'));
-
+    el('inp').value = newContent;
+    updBtn();
     send();
 }
 
@@ -199,5 +183,4 @@ function _setActive(id) {
     save();
     renderList();
     renderMsgs();
-    updTitle('idle');
 }
