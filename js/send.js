@@ -69,7 +69,7 @@ function _afterGen() {
 
 /**
  * Exibe uma mensagem de erro inline no chat e mostra um toast.
- * @param {Chat} c
+ * @param {Chat}   c
  * @param {number} t0
  * @param {string} errText
  */
@@ -92,8 +92,13 @@ async function send() {
     if ((!text && pendingImages.length === 0) || generating) return;
     if (!getValidKeys().length) { toast('Configure uma chave API', '⚠️'); openSet(); return; }
 
+    // FIX: usa customConfirm (async) em vez do confirm() nativo do browser
+    // — mantém padrão visual do app e não bloqueia a thread
     if (checkSensitiveData(text)) {
-        if (!confirm('⚠️ Detectamos o que pode ser um dado sensível (CPF, cartão ou senha). Deseja enviar mesmo assim?')) return;
+        if (!await customConfirm(
+            '⚠️ Detectamos o que pode ser um dado sensível (CPF, cartão ou senha). Deseja enviar mesmo assim?',
+            { confirmText: 'Enviar mesmo assim' }
+        )) return;
     }
 
     // Garante chat ativo
@@ -162,6 +167,7 @@ async function _generate(c) {
     updBtn();
 
     const t0 = Date.now();
+    let aborted = false;
 
     try {
         const res = await callAPI(c.messages);
@@ -172,26 +178,32 @@ async function _generate(c) {
     } catch (e) {
         _removeTyping();
         if (e.name === 'AbortError') {
+            aborted = true;
             toast('Cancelado', '🛑');
         } else {
             _showErrorMsg(c, t0, e.message);
         }
     } finally {
         _afterGen();
-        updTitle('done');
+        // FIX: título volta para 'idle' em cancelamento, não 'done'
+        updTitle(aborted ? 'idle' : 'done');
     }
 }
 
 // ─── Handler: resposta completa (não-stream) ──────────────────────────────────
 function handleFull(data, c, t0, keyUsed) {
     const cand = data.candidates?.[0];
-    if (!cand) {
-        const reason = cand?.finishReason;
-        throw new Error(reason ? `Resposta bloqueada: ${reason}` : 'Resposta vazia');
+
+    // FIX: quando !cand, cand é undefined — cand?.finishReason seria sempre undefined.
+    // Verifica finishReason no cand existente quando o content está ausente/bloqueado.
+    if (!cand || !cand.content?.parts?.length) {
+        throw new Error(cand?.finishReason
+            ? `Resposta bloqueada: ${cand.finishReason}`
+            : 'Resposta vazia');
     }
 
     let txt = '', think = '';
-    for (const p of (cand.content?.parts ?? [])) {
+    for (const p of cand.content.parts) {
         if (p.thought) think += p.text ?? '';
         else           txt   += p.text ?? '';
     }
@@ -205,6 +217,7 @@ function handleFull(data, c, t0, keyUsed) {
 // ─── Handler: stream SSE ──────────────────────────────────────────────────────
 async function handleStream(stream, c, t0, keyUsed) {
     let txt = '', think = '', lastU = null;
+    let aborted = false;
     const sid = uid();
 
     // Monta o nó de streaming
@@ -258,7 +271,13 @@ async function handleStream(stream, c, t0, keyUsed) {
             scrollDown();
         }
     } catch (e) {
-        if (e.name !== 'AbortError') throw e;
+        // FIX: re-lança AbortError para _generate poder exibir toast 'Cancelado'
+        // — antes era swallowed aqui e o usuário não recebia nenhum feedback
+        if (e.name === 'AbortError') {
+            aborted = true;
+            throw e;
+        }
+        throw e;
     }
 
     // Finaliza o renderer — congela tudo que resta
@@ -275,7 +294,8 @@ async function handleStream(stream, c, t0, keyUsed) {
 
 // ─── Botões de ação pós-stream ────────────────────────────────────────────────
 function _appendStreamActions(msgNode, txt, c, t0, keyUsed, u) {
-    const body = msgNode.querySelector('.msg-body');
+    const body   = msgNode.querySelector('.msg-body');
+    const msgIdx = c.messages.length; // índice que a mensagem terá após ser salva
 
     // Word count
     const wc    = wordCount(txt);
@@ -284,13 +304,13 @@ function _appendStreamActions(msgNode, txt, c, t0, keyUsed, u) {
     wcDiv.textContent = `${wc} palavra${wc !== 1 ? 's' : ''}`;
     body.appendChild(wcDiv);
 
-    // Botões
+    // FIX: inclui Fork — consistência com _buildMsgNode
     const acts = document.createElement('div');
     acts.className = 'msg-acts';
-
     acts.innerHTML = `
         <button class="act-btn" data-action="copy">📋 Copiar</button>
         <button class="act-btn" data-action="regen">🔄 Regenerar</button>
+        <button class="act-btn" data-action="fork">🔀 Bifurcar</button>
         <button class="act-btn" data-action="cont">▶️ Continuar</button>`;
 
     acts.addEventListener('click', async e => {
@@ -309,13 +329,23 @@ function _appendStreamActions(msgNode, txt, c, t0, keyUsed, u) {
                 regen();
                 break;
 
+            case 'fork':
+                forkChat(c.id, msgIdx);
+                break;
+
             case 'cont': {
                 if (generating) return;
                 const chat = active();
                 if (!chat || chat.messages.at(-1)?.role !== 'model') return;
+
                 chat.messages.push({ role: 'user', content: 'Continue a resposta do ponto onde parou.' });
-                btn.disabled = true;
+
+                // FIX: desabilita durante a geração e reabilita ao terminar
+                btn.disabled     = true;
+                btn.textContent  = '⏳ Gerando...';
                 await _generate(chat);
+                btn.disabled     = false;
+                btn.textContent  = '▶️ Continuar';
                 break;
             }
         }
