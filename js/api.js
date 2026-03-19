@@ -9,10 +9,6 @@ const MAX_CONTEXT_TOKENS = 800_000;
 // Status HTTP que justificam tentar a próxima chave
 const RETRYABLE_STATUSES = new Set([429, 403, 500, 502, 503]);
 
-// [FIX #1] Declaração explícita de aborter no escopo do módulo.
-// Evita ReferenceError em strict mode e documenta o propósito da variável.
-let aborter = null;
-
 // ─── Chaves ───────────────────────────────────────────────────────────────────
 /**
  * Decodifica uma chave obfuscada em base64.
